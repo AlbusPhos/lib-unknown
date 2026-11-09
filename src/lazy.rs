@@ -1,5 +1,4 @@
 // src/lazy.rs
-#![cfg(feature = "lazy")]
 
 use core::cell::UnsafeCell;
 use core::fmt;

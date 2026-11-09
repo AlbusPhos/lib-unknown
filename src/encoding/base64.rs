@@ -1,7 +1,7 @@
 // src/encoding/base64.rs
 
 #[cfg(feature = "alloc")]
-use alloc::vec::Vec;
+use alloc::{vec, vec::Vec};
 
 #[cfg_attr(coin36, cold)]
 #[cfg_attr(coin24, inline(never))]

@@ -7,6 +7,8 @@
 //! [`HeapBytes`](crate::types::buffer::HeapBytes)，需 `alloc`）实现，`Drop` 与显式擦除均经清零。
 //!
 //! 需要启用 `"types-buffer"` 特性。
+// 显式目标保证 stable rustdoc 也能解析；nightly 的 redundant_explicit_links 会将其视为冗余。
+#![allow(rustdoc::redundant_explicit_links)]
 #![allow(unused_qualifications)]
 #![allow(clippy::similar_names)]
 

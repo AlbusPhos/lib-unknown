@@ -25,6 +25,9 @@
 //! assert_eq!(err.err_type(), ErrType::CapacityExceeded { requested: 8, max: 4 });
 //! ```
 
+// 显式目标保证 stable rustdoc 也能解析；nightly 的 redundant_explicit_links 会将其视为冗余。
+#![allow(rustdoc::redundant_explicit_links)]
+
 #[cfg(feature = "alloc")]
 use alloc::string::String;
 use core::{fmt, str, time::Duration};
@@ -35,7 +38,7 @@ const MAX_MSG_LEN: usize = 62;
 /// 错误上下文文本。
 ///
 /// - 静态字符串直接借用（零分配）。
-/// - 开启 `alloc` 特性时，动态文本使用 [`String`] 在堆上完整保存。
+/// - 开启 `alloc` 特性时，动态文本使用 `String` 在堆上完整保存。
 /// - 未开启 `alloc` 特性时，动态文本在固定的 62 字节内联缓冲中截断保存，
 ///   截断时保证落在 UTF-8 字符边界上。
 #[derive(Clone)]

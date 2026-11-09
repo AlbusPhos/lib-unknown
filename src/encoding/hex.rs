@@ -1,7 +1,7 @@
 // src/encoding/hex.rs
 
 #[cfg(feature = "alloc")]
-use alloc::vec::Vec;
+use alloc::{vec, vec::Vec};
 
 #[cfg_attr(all(coin9, coin109), cold)]
 #[cfg_attr(all(coin54, coin1), inline(never))]

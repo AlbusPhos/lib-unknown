@@ -137,7 +137,7 @@ fn main() {}
 
 1. **常规目标零第三方依赖，体积最小化。** 非 WASM 目标上的 `no_std` 构建不引入任何
    `crates.io` 依赖；`wasm32-unknown-unknown` 仅在 `rand-seed` 下可选 `wasm-bindgen`，
-   `wasm32-wasip1` 通过 `wasi` 绑定读取单调时钟。
+   `wasm32-wasip1` / `wasm32-wasip2` 通过 `wasi`（WASI 0.2）绑定读取单调时钟。
 2. **编译期多态，逐次构建差异化。** 构建脚本根据运行时熵生成种子，逐位派生
    `coin0..coin127`，并依据 `dice1` / `dice2` / `dice6` / `dice8` 在等价实现间轮转选择，
    改变内联策略、冷热路径、常量掩码乃至算法形态。注意：Cargo 会缓存构建脚本输出，
@@ -153,7 +153,7 @@ fn main() {}
 | 我们选择了           | 而不是         | 原因                                                                 |
 |:---------------------|:---------------|:---------------------------------------------------------------------|
 | 零默认依赖与自研实现 | 复用生态 crate | 减少特征、降低供应链面、便于审计，并保证无 libc 的 `no_std` 构建     |
-| 构建期随机化         | 可复现构建     | 换取函数布局、常量与实现形态的逐构建差异，用于干扰静态分析与对抗tlsh |
+| 构建期随机化         | 可复现构建     | 换取函数布局、常量与实现形态的逐构建差异，用于干扰静态分析与 TLSH 等模糊哈希 |
 | `no_std` 优先        | 默认启用 `std` | 适配嵌入式、受控客户端与无 libc 环境；`std` / `alloc` 需显式开启     |
 
 ---
@@ -252,12 +252,14 @@ cargo build --release --no-default-features \
     - `wasm32-unknown-unknown`：支持非 `sys` 模块；需使用 `--no-default-features`，
       启用 `rand` 时通过 `wasm-bindgen` 获取浏览器 `performance.now()` 熵源。
     - `wasm32-wasip1`：支持非 `sys` 模块；需使用 `--no-default-features`，
-      `rand-seed` 通过 `wasi 0.11`（WASI preview1）读取单调时钟。
-    - `wasm32-wasip2`：非 `sys` 模块可编译；当前 WASI 绑定面向 preview1，
-      Component Model 运行期兼容性尚未验证。
+      `rand-seed` 通过 `wasi 0.14`（WASI 0.2 / preview2 绑定）读取单调时钟。
+      目标本体可编译，但运行期需宿主提供 `wasi:clocks/monotonic-clock@0.2` 组件导入；
+      仅支持 preview1 的运行时兼容性尚未验证。
+    - `wasm32-wasip2`：非 `sys` 模块可编译；`rand-seed` 使用同一套 WASI 0.2 绑定，
+      仅在支持 Component Model / WASI 0.2 的运行时下可用。
 - **系统与外部依赖**：非 WASM 目标为纯 Rust 实现，默认零第三方依赖、不链接 libc，
   无需 C 工具链或 `pkg-config`；`sys` 的裸系统调用依赖目标架构内联汇编。
-  WASM 目标按需引入 `wasm-bindgen`（非 WASI）或 `wasi`（WASI preview1）。
+  WASM 目标按需引入 `wasm-bindgen`（非 WASI）或 `wasi`（WASI 0.2 / preview2）。
 
 <details>
 <summary><b>目标三元组支持矩阵 (Target Support Matrix)</b></summary>
@@ -284,8 +286,8 @@ cargo build --release --no-default-features \
 | `i686-pc-windows-msvc`        | x86      | **Tier 3**  |                                           |
 | `x86_64-unknown-none`         | x86_64   | **Tier 3**  |                                           |
 | `wasm32-unknown-unknown`      | Wasm     | **Tier 2**  |                                           |
-| `wasm32-wasip1`               | Wasm     | **Tier 2**  |                                           |
-| `wasm32-wasip2`               | Wasm     | **Tier 3**  |                                           |
+| `wasm32-wasip1`               | Wasm     | **Tier 2**  | 非 `sys` 模块编译通过；`rand-seed` 需 WASI 0.2 运行时 |
+| `wasm32-wasip2`               | Wasm     | **Tier 3**  | 非 `sys` 模块编译通过；`rand-seed` 需 WASI 0.2 运行时 |
 
 **等级定义说明**：
 
@@ -316,11 +318,11 @@ cargo build --release --no-default-features \
   与核心定位冲突的功能特性可能不会被合入，建议先通过 Issue 讨论。
 - 提交 PR 前请确保在本地通过以下检查：
 
-  ```bash
-  cargo fmt --all -- --check
-  cargo clippy --all-targets --all-features -- -D warnings
-  cargo test --all-features
-  ```
+```bash
+cargo fmt --all -- --check
+cargo clippy --all-targets --all-features -- -D warnings
+cargo test --all-features
+```
 
 - 改动涉及 `feature` 或 `pub` API 时，请同步更新 README 与 CHANGELOG。
 

@@ -8,15 +8,24 @@
 > **版本号说明（0.x 阶段）**：在 1.0.0 发布之前，次版本号（`0.MINOR.0`）的变更
 > 也可能包含破坏性改动，请留意标注为 **[BREAKING]** 的条目。
 
+
 ---
 
 ## [Unreleased]
 
+
+---
+
+## [0.3.2] - 2026-11-09
+
 ### Added
--
+- `Cargo.toml` 补充 `authors`、`repository`、`homepage`、`documentation` 元数据。
 
 ### Changed
--
+- `wasi` 依赖由 `0.11.1` 升级至 `0.14`，`rand-seed` 的单调时钟读取迁移到 WASI 0.2
+  （preview2）API `wasi::clocks::monotonic_clock::now()`；README 的 WASM 支持说明同步更新。
+- `description` 元数据移除反引号；`homepage` 指向维护者主页。
+- `rand::Seed128` 文档明确整数种子扩展规则（无符号零扩展、有符号符号扩展）。
 
 ### Deprecated
 -
@@ -25,7 +34,12 @@
 -
 
 ### Fixed
--
+- 修复 `wasm32-wasip1` + `rand-seed` 构建失败（`wasi 0.14` 已移除
+  `clock_time_get` / `CLOCKID_MONOTONIC`）。
+- 修复 `encoding` 在 `no_std + alloc` 下缺少 `vec!` 宏导入导致的构建失败。
+- 修复 rustdoc 文档构建告警：统一 `errors` / `types` / `sys::unix::syscall`
+  的 intra-doc 链接在 stable 与 nightly 下的解析方式，并避免关闭 `alloc` 时
+  `String` 链接失效。
 
 ### Security
 -
@@ -84,5 +98,6 @@
 
 ---
 
-[Unreleased]: https://github.com/AlbusPhos/lib-unknown/compare/v0.3.1...HEAD
+[Unreleased]: https://github.com/AlbusPhos/lib-unknown/compare/v0.3.2...HEAD
+[0.3.2]: https://github.com/AlbusPhos/lib-unknown/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/AlbusPhos/lib-unknown/releases/tag/v0.3.1

@@ -145,9 +145,9 @@ pub fn probe() -> u64 {
         {
             #[cfg(target_os = "wasi")]
             {
-                // SAFETY: WASI preview1 单调时钟读取仅返回时间戳标量，不访问宿主内存；
-                // 失败时返回 0，不影响 `raw_probe` 的熵混合流程。
-                unsafe { wasi::clock_time_get(wasi::CLOCKID_MONOTONIC, 1) }.unwrap_or(0)
+                // WASI 0.2（preview2）单调时钟：`now()` 为安全函数，仅返回时间戳标量，
+                // 不访问宿主内存；不可表示的时间值由宿主 trap，不影响 `raw_probe` 的熵混合流程。
+                wasi::clocks::monotonic_clock::now()
             }
             #[cfg(not(target_os = "wasi"))]
             {

@@ -2,7 +2,7 @@
 #![doc = include_str!("../README.md")]
 #![cfg_attr(not(feature = "std"), no_std)]
 #![cfg_attr(docsrs, feature(doc_cfg))]
-#![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used))]
+#![allow(clippy::needless_doctest_main)]
 
 #[cfg(feature = "alloc")]
 extern crate alloc;
@@ -35,7 +35,6 @@ pub mod rand;
     feature = "sys-win",
     feature = "sys-unix"
 ))]
-
 /// 裸系统调用、各平台调用号常量与动态符号解析。详见 [`sys`]。
 pub mod sys;
 

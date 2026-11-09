@@ -4,6 +4,9 @@
 //!
 //! 需要启用 `"sys-unix"` 特性。
 
+// 显式目标保证 stable rustdoc 也能解析；nightly 的 redundant_explicit_links 会将其视为冗余。
+#![allow(rustdoc::redundant_explicit_links)]
+
 #[cfg(not(any(
     all(
         any(target_os = "linux", target_os = "android"),
