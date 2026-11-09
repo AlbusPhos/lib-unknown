@@ -1,0 +1,114 @@
+[package]
+name = "lib-unknown"
+version = "0.3.1"
+edition = "2024"
+rust-version = "1.92"
+license = "MPL-2.0"
+readme = "README.md"
+description = "A `no_std` library with compile-time randomized system calls, random number generation, cryptography, and encoding."
+keywords = ["no-std", "syscall", "crypto", "rand", "obfuscation"]
+categories = ["no-std", "cryptography", "os"]
+
+[dependencies]
+
+
+[target.'cfg(all(target_arch = "wasm32", not(target_os = "wasi")))'.dependencies]
+wasm-bindgen = { version = "0.2", optional = true }
+
+[target.'cfg(all(target_arch = "wasm32", target_os = "wasi"))'.dependencies]
+wasi = { version = "0.11.1", default-features = false, optional = true }
+
+
+
+[features]
+default = [
+#    "std",
+    "rand",
+    "sys",
+    "types",
+    "crypto",
+    "hash",
+    "lazy",
+    "encoding",
+]
+std = ["alloc"]
+alloc = []
+
+
+rand-seed = [
+    "dep:wasm-bindgen",
+    "dep:wasi",
+]
+rand-core = [
+    "rand-splitmix64",
+    "crypto-core"
+]
+rand-splitmix64 = ["crypto-core"]
+rand-cwg = ["crypto-core"]
+rand-chacha = ["crypto-core"]
+rand-xoshiro = ["crypto-core"]
+rand-default = [
+    "rand-seed",
+    "rand-core",
+]
+
+rand = [
+    "rand-default",
+    "rand-chacha",
+    "rand-xoshiro",
+    "rand-cwg"
+]
+
+
+sys-syscall = []
+sys-win = []
+sys-unix = []
+sys = [
+    "sys-win",
+    "sys-unix",
+    "sys-syscall"
+]
+
+
+types-buffer = []
+types-str = ["types-buffer"]
+types-cstr = ["types-buffer"]
+types = [
+    "types-str",
+    "types-buffer",
+    "types-cstr",
+]
+
+crypto-core = ["lazy"]
+crypto-mse = ["crypto-core"]
+crypto-mse2 = ["crypto-core"]
+crypto-chacha20 = ["crypto-core"]
+crypto = [
+    "crypto-core",
+    "crypto-mse",
+    "crypto-chacha20",
+    "crypto-mse2"
+]
+
+hash-base = []
+hash-hashmap = ["hash-base"]
+hash = [
+    "hash-base",
+    "hash-hashmap",
+]
+
+lazy = []
+
+encoding-hex = []
+encoding-base64 = []
+encoding = [
+    "encoding-hex",
+    "encoding-base64",
+]
+
+
+dyntest = ["std", "rand"]
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
