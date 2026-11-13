@@ -13,6 +13,11 @@
 
 ## [Unreleased]
 
+
+---
+
+## [0.4.1] - 2026-11-13
+
 ### Added
 - `Buffer` trait 新增带默认实现的 `new_zeroed(len)`，用于构造“长度为 `len`、内容全零”的容器；
   `StackBuffer` / `HeapBuffer` 提供同名固有实现，直接复用初始化时的全零存储、仅在容量校验
@@ -30,9 +35,10 @@
   内联汇编局部标签由 `1`/`0` 改为 `2`；`sys_ptrace` 文档示例按平台选择
   `PT_TRACE_ME` / `PTRACE_TRACEME`，修复 macOS doctest 编译失败；新增 macOS 原生
   syscall smoke test（`getpid` / `gettid` / `open` + `close`）。
+
+### Removed
 - **[BREAKING]** 移除 macOS 的 `constants::GETCWD`：macOS 没有 `getcwd` 系统调用
   （libc 通过 `fcntl(F_GETPATH)` 实现），原值 `277` 实际指向 `open_extended`。
-
 
 ---
 
@@ -186,7 +192,8 @@
 
 ---
 
-[Unreleased]: https://github.com/AlbusPhos/lib-unknown/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/AlbusPhos/lib-unknown/compare/v0.4.1...HEAD
+[0.4.1]: https://github.com/AlbusPhos/lib-unknown/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/AlbusPhos/lib-unknown/compare/v0.3.2...v0.4.0
 [0.3.2]: https://github.com/AlbusPhos/lib-unknown/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/AlbusPhos/lib-unknown/releases/tag/v0.3.1
