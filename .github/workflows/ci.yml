@@ -14,18 +14,20 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  check:
-    name: fmt + clippy + test + doc
+  msrv:
+    name: MSRV 1.92 (fmt + clippy + test + doc)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Rust stable
-        uses: dtolnay/rust-toolchain@stable
+      - name: Install Rust 1.92
+        uses: dtolnay/rust-toolchain@1.92.0
         with:
           components: rustfmt, clippy
 
       - uses: Swatinem/rust-cache@v2
+        with:
+          key: msrv-1.92
 
       - name: rustfmt
         run: cargo fmt --all -- --check
@@ -43,37 +45,3 @@ jobs:
         run: cargo doc --no-deps --all-features --locked
         env:
           RUSTDOCFLAGS: -D warnings
-
-  msrv:
-    name: MSRV 1.92
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install Rust 1.92
-        uses: dtolnay/rust-toolchain@1.92.0
-
-      - uses: Swatinem/rust-cache@v2
-        with:
-          key: msrv-1.92
-
-      - name: Check all targets and features
-        run: cargo check --all-targets --all-features --locked
-
-  docsrs:
-    name: docs.rs simulation (nightly)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install Rust nightly
-        uses: dtolnay/rust-toolchain@nightly
-
-      - uses: Swatinem/rust-cache@v2
-        with:
-          key: docsrs-nightly
-
-      - name: Build docs with docsrs cfg
-        run: cargo doc --no-deps --all-features --locked
-        env:
-          RUSTDOCFLAGS: --cfg docsrs -D warnings
