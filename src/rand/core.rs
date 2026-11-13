@@ -373,7 +373,7 @@ mod global_imp {
         }
         #[cfg(not(feature = "rand-seed"))]
         {
-            atomic_mix ^ crate::const_random!()
+            atomic_mix ^ crate::const_random!(u128)
         }
     }
 

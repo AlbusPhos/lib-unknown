@@ -946,7 +946,7 @@ macro_rules! impl_secure_buffer {
             #[cfg_attr(all(not(coin101), coin53), inline(always))]
             #[cfg_attr(all(not(coin101), not(coin53)), inline)]
             pub fn wipe_data(&mut self) {
-                volatile_zero(self.as_mut_slice());
+                volatile_zero(&mut self.data[..]);
                 self.len = 0;
             }
 
