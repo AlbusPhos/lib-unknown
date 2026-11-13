@@ -6,6 +6,9 @@ on:
   pull_request:
     branches: [main]
 
+permissions:
+  contents: read
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -15,7 +18,7 @@ env:
 
 jobs:
   msrv:
-    name: MSRV 1.92 (fmt + clippy + test + doc)
+    name: MSRV 1.92 (fmt + clippy + no_std + test + doc)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -32,16 +35,136 @@ jobs:
       - name: rustfmt
         run: cargo fmt --all -- --check
 
-      - name: clippy
-        run: cargo clippy --all-targets --all-features -- -D warnings
+      # 1. 验证纯 no_std (默认特性，无 alloc/std) 的 Clippy 与测试
+      - name: clippy (no_std default)
+        run: cargo clippy --all-targets --locked -- -D warnings
 
-      - name: test
+      - name: check (no-default-features)
+        run: cargo check --no-default-features --locked
+
+      - name: check (no_std + alloc)
+        run: cargo check --no-default-features --features alloc,rand,sys,types,crypto,hash,lazy,encoding --locked
+
+      # 2. 验证全特性 (含 std, alloc, dyntest) 的 Clippy 与测试
+      - name: clippy (all-features)
+        run: cargo clippy --all-targets --all-features --locked -- -D warnings
+
+      - name: test (no_std default)
+        run: cargo test --locked
+
+      - name: test (all-features, includes doctests)
         run: cargo test --all-features --locked
-
-      - name: doctest (README as rustdoc)
-        run: cargo test --doc --all-features --locked
 
       - name: doc build (deny warnings)
         run: cargo doc --no-deps --all-features --locked
         env:
           RUSTDOCFLAGS: -D warnings
+
+  platform:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Windows x86_64 (MSVC)
+            os: windows-latest
+            target: x86_64-pc-windows-msvc
+          - name: Windows i686 (MSVC, 32-bit)
+            os: windows-latest
+            target: i686-pc-windows-msvc
+          - name: macOS x86_64
+            os: macos-15-intel
+            target: x86_64-apple-darwin
+          - name: macOS arm64
+            os: macos-15
+            target: aarch64-apple-darwin
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust stable + target
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.target }}
+
+      - name: test (no_std default)
+        run: cargo test --locked --target ${{ matrix.target }}
+
+      - name: test (all-features, includes doctests)
+        run: cargo test --all-features --locked --target ${{ matrix.target }}
+
+      - name: doc build (deny warnings)
+        run: cargo doc --no-deps --all-features --locked --target ${{ matrix.target }}
+        env:
+          RUSTDOCFLAGS: -D warnings
+
+  check-targets:
+    name: Cross-Check Tier 2/3 Targets
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust stable + cross targets
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: >-
+            x86_64-unknown-linux-musl,
+            i686-unknown-linux-gnu,
+            aarch64-unknown-linux-gnu,
+            riscv64gc-unknown-linux-gnu,
+            x86_64-linux-android,
+            aarch64-linux-android,
+            i686-linux-android,
+            armv7-linux-androideabi,
+            x86_64-pc-windows-gnu,
+            x86_64-pc-windows-gnullvm,
+            aarch64-pc-windows-msvc,
+            x86_64-unknown-none,
+            wasm32-unknown-unknown,
+            wasm32-wasip1,
+            wasm32-wasip2
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: cross-check-all
+
+      - name: Check full-support targets (no_std & all-features)
+        run: |
+          set -euo pipefail
+          TARGETS=(
+            x86_64-unknown-linux-musl
+            i686-unknown-linux-gnu
+            aarch64-unknown-linux-gnu
+            riscv64gc-unknown-linux-gnu
+            x86_64-linux-android
+            aarch64-linux-android
+            i686-linux-android
+            x86_64-pc-windows-gnu
+            x86_64-pc-windows-gnullvm
+            aarch64-pc-windows-msvc
+          )
+          for target in "${TARGETS[@]}"; do
+            echo "::group::Checking $target"
+            cargo check --locked --target "$target"
+            cargo check --locked --target "$target" --all-features
+            echo "::endgroup::"
+          done
+
+      - name: Check bare-metal target (no_std only)
+        run: |
+          cargo check --locked --target x86_64-unknown-none --no-default-features --features alloc,rand,types,crypto,hash,lazy,encoding
+
+      - name: Check non-sys targets (ARMv7 & WASM)
+        run: |
+          set -euo pipefail
+          NON_SYS_FEATURES="rand,types,crypto,hash,lazy,encoding"
+          for target in armv7-linux-androideabi wasm32-unknown-unknown wasm32-wasip1 wasm32-wasip2; do
+            echo "::group::Checking $target"
+            cargo check --locked --target "$target" --no-default-features --features "$NON_SYS_FEATURES"
+            echo "::endgroup::"
+          done

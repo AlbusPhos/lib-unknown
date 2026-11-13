@@ -394,6 +394,7 @@ pub mod constants {
     pub const CHDIR: usize = 12;
     pub const GETPID: usize = 20;
     pub const GETUID: usize = 24;
+    pub const ACCEPT: usize = 30;
     pub const KILL: usize = 37;
     pub const GETPPID: usize = 39;
     pub const SIGACTION: usize = 46;
@@ -413,6 +414,7 @@ pub mod constants {
     pub const MKDIR: usize = 136;
     pub const RMDIR: usize = 137;
     pub const MMAP: usize = 197;
+    pub const LSEEK: usize = 199;
     pub const GETCWD: usize = 277;
     pub const KQUEUE: usize = 362;
     pub const KEVENT: usize = 363;

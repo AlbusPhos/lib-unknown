@@ -24,6 +24,9 @@
 - 修复 `Buffer::wipe_data` 只擦除 `data[..len]`、与其“清零全部底层存储”文档及 `Drop`
   行为不一致的问题；现在显式擦除会覆盖完整容量 `data[..N]`，未使用区域不再可能残留旧数据。
   代价是该操作由 O(len) 变为 O(N)，与对象销毁时的擦除成本一致。
+- 修复 macOS 平台编译：补齐 XNU 常量表中的 `ACCEPT` 与 `LSEEK` 调用号，并将 macOS
+  x86_64 内联汇编的局部标签由 `1`/`0` 改为 `2`，使 `--all-features` 在
+  `x86_64-apple-darwin` / `aarch64-apple-darwin` 下可编译。
 
 
 ---

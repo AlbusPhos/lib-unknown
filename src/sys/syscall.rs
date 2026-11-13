@@ -137,9 +137,9 @@ pub unsafe fn syscall0(n: usize) -> isize {
         let sys_num = n | 0x2000000;
         core::arch::asm!(
         "syscall",
-        "jnc 1f",
+        "jnc 2f",
         "neg rax",
-        "1:",
+        "2:",
         in("rax") sys_num,
         lateout("rax") ret,
         lateout("rcx") _,
@@ -303,9 +303,9 @@ pub unsafe fn syscall1(n: usize, a1: usize) -> isize {
         let sys_num = n | 0x2000000;
         core::arch::asm!(
         "syscall",
-        "jnc 1f",
+        "jnc 2f",
         "neg rax",
-        "1:",
+        "2:",
         in("rax") sys_num,
         in("rdi") a1,
         lateout("rax") ret,
@@ -474,9 +474,9 @@ pub unsafe fn syscall2(n: usize, a1: usize, a2: usize) -> isize {
         let sys_num = n | 0x2000000;
         core::arch::asm!(
         "syscall",
-        "jnc 1f",
+        "jnc 2f",
         "neg rax",
-        "1:",
+        "2:",
         in("rax") sys_num,
         in("rdi") a1,
         in("rsi") a2,
@@ -650,9 +650,9 @@ pub unsafe fn syscall3(n: usize, a1: usize, a2: usize, a3: usize) -> isize {
         let sys_num = n | 0x2000000;
         core::arch::asm!(
         "syscall",
-        "jnc 1f",
+        "jnc 2f",
         "neg rax",
-        "1:",
+        "2:",
         in("rax") sys_num,
         in("rdi") a1,
         in("rsi") a2,
@@ -840,9 +840,9 @@ pub unsafe fn syscall4(n: usize, a1: usize, a2: usize, a3: usize, a4: usize) -> 
         let sys_num = n | 0x2000000;
         core::arch::asm!(
         "syscall",
-        "jnc 1f",
+        "jnc 2f",
         "neg rax",
-        "1:",
+        "2:",
         in("rax") sys_num,
         in("rdi") a1,
         in("rsi") a2,
@@ -1039,9 +1039,9 @@ pub unsafe fn syscall5(n: usize, a1: usize, a2: usize, a3: usize, a4: usize, a5:
         let sys_num = n | 0x2000000;
         core::arch::asm!(
         "syscall",
-        "jnc 1f",
+        "jnc 2f",
         "neg rax",
-        "1:",
+        "2:",
         in("rax") sys_num,
         in("rdi") a1,
         in("rsi") a2,
@@ -1263,9 +1263,9 @@ pub unsafe fn syscall6(
         let sys_num = n | 0x2000000;
         core::arch::asm!(
         "syscall",
-        "jnc 1f",
+        "jnc 2f",
         "neg rax",
-        "1:",
+        "2:",
         in("rax") sys_num,
         in("rdi") a1,
         in("rsi") a2,
