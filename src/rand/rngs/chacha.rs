@@ -133,8 +133,6 @@ impl<const ROUNDS: usize> ChaCha<ROUNDS> {
     }
 
     /// 产出一个 64 位输出；预生成缓冲耗尽时重新执行核心块并递增计数器。`const` 可用。
-    #[cfg_attr(coin93, cold)]
-    #[cfg_attr(all(coin31, coin81), inline(never))]
     #[cfg_attr(not(all(coin31, coin81)), inline(always))]
     pub const fn next(&mut self) -> u64 {
         if self.index >= 8 {
@@ -159,8 +157,6 @@ impl<const ROUNDS: usize> From<u128> for ChaCha<ROUNDS> {
 
 #[cfg(feature = "rand-core")]
 impl<const ROUNDS: usize> RngCore for ChaCha<ROUNDS> {
-    #[cfg_attr(all(coin41, coin73), cold)]
-    #[cfg_attr(any(coin13, coin25), inline(never))]
     #[cfg_attr(not(any(coin13, coin25)), inline(always))]
     fn next_u64(&mut self) -> u64 {
         self.next()

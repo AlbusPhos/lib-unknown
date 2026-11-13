@@ -5,7 +5,6 @@ use crate::crypto::core::rp::rpp128;
 #[cfg(feature = "rand-seed")]
 use crate::rand::seed::seed128;
 
-#[cfg_attr(any(coin5, coin105), cold)]
 #[cfg_attr(all(coin99, coin114), inline(never))]
 #[cfg_attr(not(all(coin99, coin114)), inline(always))]
 const fn seed_to_state_cwg64(seed: u128) -> [u64; 4] {
@@ -18,8 +17,6 @@ const fn seed_to_state_cwg64(seed: u128) -> [u64; 4] {
     ]
 }
 
-#[cfg_attr(coin42, cold)]
-#[cfg_attr(any(coin41, coin21), inline(never))]
 #[cfg_attr(not(any(coin41, coin21)), inline(always))]
 const fn step_cwg64(s: &mut [u64; 4]) {
     s[1] = s[1].wrapping_add(s[0]);
@@ -52,8 +49,6 @@ impl Cwg64 {
     }
 
     /// 推进一步并输出 ((s1 >> 48) ^ s0)。`const` 可用。
-    #[cfg_attr(coin108, cold)]
-    #[cfg_attr(any(coin20, coin75), inline(never))]
     #[cfg_attr(not(any(coin20, coin75)), inline(always))]
     pub const fn next(&mut self) -> u64 {
         step_cwg64(&mut self.s);
@@ -72,10 +67,7 @@ impl From<u128> for Cwg64 {
 
 #[cfg(feature = "rand-core")]
 impl RngCore for Cwg64 {
-    #[cfg_attr(all(coin44, coin55), cold)]
-    #[cfg_attr(coin83, inline(never))]
     #[cfg_attr(all(not(coin83), coin92), inline(always))]
-    #[cfg_attr(all(not(coin83), not(coin92)), inline)]
     fn next_u64(&mut self) -> u64 {
         self.next()
     }
@@ -92,8 +84,6 @@ impl Default for Cwg64 {
     }
 }
 
-#[cfg_attr(all(coin89, coin59), cold)]
-#[cfg_attr(coin17, inline(never))]
 #[cfg_attr(not(coin17), inline(always))]
 const fn step_cwg128x64(x: &mut u128, a: &mut u64, weyl: &mut u64, s: u64) {
     *a = a.wrapping_add(*x as u64);
@@ -114,9 +104,7 @@ impl Cwg128x64 {
     const WARMUP: usize = 48;
 
     /// 由 128 位种子构造（`rpp128` 展开状态后 48 次暖启动）。
-    #[cfg_attr(coin4, cold)]
     #[cfg_attr(any(coin120, coin47), inline(never))]
-    #[cfg_attr(not(any(coin120, coin47)), inline(always))]
     pub const fn from_seed(seed: u128) -> Self {
         let [x1, x2] = rpp128(seed);
 
@@ -135,11 +123,7 @@ impl Cwg128x64 {
     }
 
     /// 推进一步并输出 128 位折叠结果。`const` 可用。
-    /// 推进一步并输出 128 位折叠结果。`const` 可用。
-    #[cfg_attr(all(coin17, coin8), cold)]
-    #[cfg_attr(coin53, inline(never))]
     #[cfg_attr(all(not(coin53), coin101), inline(always))]
-    #[cfg_attr(all(not(coin53), not(coin101)), inline)]
     pub const fn next(&mut self) -> u128 {
         step_cwg128x64(&mut self.x, &mut self.a, &mut self.weyl, self.s);
         ((self.a >> 48) as u128) ^ self.x
@@ -147,8 +131,6 @@ impl Cwg128x64 {
 }
 
 impl From<u128> for Cwg128x64 {
-    #[cfg_attr(any(coin42, coin25), cold)]
-    #[cfg_attr(any(coin62, coin57), inline(never))]
     #[cfg_attr(not(any(coin62, coin57)), inline(always))]
     fn from(value: u128) -> Self {
         Self::from_seed(value)
@@ -157,24 +139,17 @@ impl From<u128> for Cwg128x64 {
 
 #[cfg(feature = "rand-core")]
 impl RngCore for Cwg128x64 {
-    #[cfg_attr(coin26, cold)]
-    #[cfg_attr(coin67, inline(never))]
     #[cfg_attr(not(coin67), inline(always))]
     fn next_u64(&mut self) -> u64 {
         self.next() as u64
     }
 
-    #[cfg_attr(coin86, cold)]
-    #[cfg_attr(any(coin127, coin64), inline(never))]
     #[cfg_attr(not(any(coin127, coin64)), inline(always))]
     fn next_u128(&mut self) -> u128 {
         self.next()
     }
 
-    #[cfg_attr(all(coin48, coin96), cold)]
-    #[cfg_attr(coin2, inline(never))]
-    #[cfg_attr(all(not(coin2), coin60), inline(always))]
-    #[cfg_attr(all(not(coin2), not(coin60)), inline)]
+    #[cfg_attr(coin2, inline(always))]
     fn fill_bytes(&mut self, dest: &mut [u8]) {
         fill_bytes_via_u128(self, dest)
     }
@@ -190,8 +165,6 @@ impl Default for Cwg128x64 {
     }
 }
 
-#[cfg_attr(all(coin89, coin57), cold)]
-#[cfg_attr(coin126, inline(never))]
 #[cfg_attr(not(coin126), inline(always))]
 const fn seed_to_state_cwg128(seed: u128) -> [u128; 4] {
     let [x1, x2] = rpp128(seed);
@@ -204,7 +177,6 @@ const fn seed_to_state_cwg128(seed: u128) -> [u128; 4] {
 }
 
 #[cfg_attr(coin5, cold)]
-#[cfg_attr(any(coin75, coin57), inline(never))]
 #[cfg_attr(not(any(coin75, coin57)), inline(always))]
 const fn step_cwg128(c: &mut [u128; 4]) {
     c[2] = c[2].wrapping_add(c[1]);
@@ -222,8 +194,6 @@ impl Cwg128 {
     const WARMUP: usize = 96;
 
     /// 由 128 位种子构造（`rpp128` 展开状态后 96 次暖启动）。
-    #[cfg_attr(all(coin120, coin48), cold)]
-    #[cfg_attr(coin59, inline(never))]
     #[cfg_attr(not(coin59), inline(always))]
     pub const fn from_seed(seed: u128) -> Self {
         let mut state = seed_to_state_cwg128(seed);
@@ -235,9 +205,6 @@ impl Cwg128 {
         Self { c: state }
     }
 
-    #[cfg_attr(any(coin59, coin127), cold)]
-    #[cfg_attr(coin78, inline(never))]
-    #[cfg_attr(all(not(coin78), coin109), inline(always))]
     #[cfg_attr(all(not(coin78), not(coin109)), inline)]
     /// 推进一步 CGW128 状态并输出 128 位结果。
     pub const fn next(&mut self) -> u128 {
@@ -247,8 +214,6 @@ impl Cwg128 {
 }
 
 impl From<u128> for Cwg128 {
-    #[cfg_attr(all(coin8, coin67), cold)]
-    #[cfg_attr(coin43, inline(never))]
     #[cfg_attr(not(coin43), inline(always))]
     fn from(value: u128) -> Self {
         Self::from_seed(value)
@@ -257,24 +222,17 @@ impl From<u128> for Cwg128 {
 
 #[cfg(feature = "rand-core")]
 impl RngCore for Cwg128 {
-    #[cfg_attr(coin20, cold)]
-    #[cfg_attr(coin70, inline(never))]
     #[cfg_attr(all(not(coin70), coin85), inline(always))]
-    #[cfg_attr(all(not(coin70), not(coin85)), inline)]
     fn next_u64(&mut self) -> u64 {
         self.next() as u64
     }
 
-    #[cfg_attr(coin31, cold)]
-    #[cfg_attr(any(coin119, coin111), inline(never))]
-    #[cfg_attr(not(any(coin119, coin111)), inline(always))]
+    #[cfg_attr(any(coin119, coin111), inline(always))]
     fn next_u128(&mut self) -> u128 {
         self.next()
     }
 
-    #[cfg_attr(all(coin13, coin85), cold)]
-    #[cfg_attr(all(coin46, coin10), inline(never))]
-    #[cfg_attr(not(all(coin46, coin10)), inline(always))]
+    #[cfg_attr(all(coin46, coin10), inline(always))]
     fn fill_bytes(&mut self, dest: &mut [u8]) {
         fill_bytes_via_u128(self, dest)
     }
@@ -282,8 +240,6 @@ impl RngCore for Cwg128 {
 
 #[cfg(feature = "rand-seed")]
 impl Default for Cwg128 {
-    #[cfg_attr(any(coin108, coin24), cold)]
-    #[cfg_attr(all(coin80, coin2), inline(never))]
     #[cfg_attr(not(all(coin80, coin2)), inline(always))]
     fn default() -> Self {
         Self::from_seed(seed128())

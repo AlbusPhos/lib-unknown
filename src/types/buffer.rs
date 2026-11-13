@@ -7,7 +7,7 @@
 //! [`HeapBytes`](crate::types::buffer::HeapBytes)，需 `alloc`）实现，`Drop` 与显式擦除均经清零。
 //!
 //! 需要启用 `"types-buffer"` 特性。
-// 显式目标保证 stable rustdoc 也能解析；nightly 的 redundant_explicit_links 会将其视为冗余。
+
 #![allow(rustdoc::redundant_explicit_links)]
 #![allow(unused_qualifications)]
 #![allow(clippy::similar_names)]
@@ -279,12 +279,77 @@ pub trait Buffer<T: ZeroablePrimitive = u8>:
     /// 返回已写入数据的长度（元素个数）。
     fn len(&self) -> usize;
 
+    /// 返回容器剩余可写入容量（元素个数），等于 `capacity() - len()`。
+    #[inline]
+    fn remaining_capacity(&self) -> usize {
+        self.capacity().saturating_sub(self.len())
+    }
+
     /// 已写入数据是否为空。
     #[cfg_attr(all(coin60, coin62), cold)]
     #[cfg_attr(coin101, inline(never))]
     #[cfg_attr(not(coin101), inline(always))]
     fn is_empty(&self) -> bool {
         self.len() == 0
+    }
+
+    /// 将容器长度截断至 `new_len`，并**立即清零**被丢弃的尾部区间。
+    ///
+    /// 若 `new_len >= self.len()`，则不执行任何操作。
+    fn truncate(&mut self, new_len: usize);
+
+    /// 移除并返回容器末尾元素，同时**立即清零**该元素在容器中的原内存槽位。
+    ///
+    /// 若容器为空则返回 `None`。
+    fn pop(&mut self) -> Option<T>;
+
+    /// 在容器末尾追加单个元素，并在追加后清零入参副本 `value`。
+    ///
+    /// # Errors
+    ///
+    /// - 当容器已满时返回 [`ErrType::CapacityExceeded`]，容器内容不变。
+    #[inline]
+    fn push(&mut self, mut value: T) -> BufferResult {
+        let res = self.extend_from_slice(core::slice::from_ref(&value));
+        volatile_zero(core::slice::from_mut(&mut value));
+        res
+    }
+
+    /// 将容器长度调整为 `new_len`。
+    ///
+    /// - 若 `new_len > self.len()`，则以 `value` 填充新增区间（随后清零入参副本 `value`）；
+    /// - 若 `new_len <= self.len()`，则截断并立即清零被丢弃的尾部区间。
+    ///
+    /// # Errors
+    ///
+    /// - 当 `new_len > self.capacity()` 时返回 [`ErrType::CapacityExceeded`]，容器内容不变。
+    fn resize(&mut self, new_len: usize, value: T) -> BufferResult;
+
+    /// 将容器长度调整为 `new_len`，新增元素以全零（`T::ZERO`）初始化；若缩短则清零被截断尾部。
+    ///
+    /// # Errors
+    ///
+    /// - 当 `new_len > self.capacity()` 时返回 [`ErrType::CapacityExceeded`]，容器内容不变。
+    #[inline]
+    fn resize_zeroed(&mut self, new_len: usize) -> BufferResult {
+        self.resize(new_len, T::ZERO)
+    }
+
+    /// 在容器末尾追加 `added_len` 个全零元素（`T::ZERO`）。
+    ///
+    /// # Errors
+    ///
+    /// - 当追加后总长度超出容量时返回 [`ErrType::CapacityExceeded`]，容器内容不变。
+    #[inline]
+    fn extend_zeroed(&mut self, added_len: usize) -> BufferResult {
+        let max = self.capacity();
+        let new_len = self.len().checked_add(added_len).ok_or_else(|| {
+            err!(ErrType::CapacityExceeded {
+                requested: usize::MAX,
+                max,
+            })
+        })?;
+        self.resize_zeroed(new_len)
     }
 
     /// 追加 `other` 的全部元素。
@@ -584,12 +649,108 @@ macro_rules! impl_secure_buffer {
                 self.len
             }
 
+            /// 返回容器剩余可写入容量（元素个数），等于 `N - len()`。
+            #[inline]
+            pub fn remaining_capacity(&self) -> usize {
+                N.saturating_sub(self.len)
+            }
+
             /// 已写入数据是否为空。
             #[cfg_attr(all(coin94, coin10), cold)]
             #[cfg_attr(coin44, inline(never))]
             #[cfg_attr(not(coin44), inline(always))]
             pub fn is_empty(&self) -> bool {
                 self.len == 0
+            }
+
+            /// 将容器长度截断至 `new_len`，并**立即清零**被丢弃的尾部区间。
+            ///
+            /// 若 `new_len >= self.len()`，则不执行任何操作。
+            #[inline]
+            pub fn truncate(&mut self, new_len: usize) {
+                if new_len < self.len {
+                    volatile_zero(&mut self.data[new_len..self.len]);
+                    self.len = new_len;
+                }
+            }
+
+            /// 移除并返回容器末尾元素，同时**立即清零**该元素在容器中的原内存槽位。
+            ///
+            /// 若容器为空则返回 `None`。
+            #[inline]
+            pub fn pop(&mut self) -> Option<T> {
+                if self.len == 0 {
+                    return None;
+                }
+                self.len -= 1;
+                let val = self.data[self.len];
+                volatile_zero(core::slice::from_mut(&mut self.data[self.len]));
+                Some(val)
+            }
+
+            /// 在容器末尾追加单个元素，并在追加后清零入参副本 `value`。
+            ///
+            /// # Errors
+            ///
+            /// - 当容器已满时返回 [`ErrType::CapacityExceeded`]，容器内容不变。
+            #[inline]
+            pub fn push(&mut self, mut value: T) -> BufferResult {
+                let res = self.extend_from_slice(core::slice::from_ref(&value));
+                volatile_zero(core::slice::from_mut(&mut value));
+                res
+            }
+
+            /// 将容器长度调整为 `new_len`。
+            ///
+            /// - 若 `new_len > self.len()`，则以 `value` 填充新增区间（随后清零入参副本 `value`）；
+            /// - 若 `new_len <= self.len()`，则截断并立即清零被丢弃的尾部区间。
+            ///
+            /// # Errors
+            ///
+            /// - 当 `new_len > N` 时返回 [`ErrType::CapacityExceeded`]，容器内容不变。
+            #[inline]
+            pub fn resize(&mut self, new_len: usize, mut value: T) -> BufferResult {
+                if new_len > N {
+                    volatile_zero(core::slice::from_mut(&mut value));
+                    bail!(ErrType::CapacityExceeded {
+                        requested: new_len,
+                        max: N,
+                    });
+                }
+                if new_len > self.len {
+                    self.data[self.len..new_len].fill(value);
+                    self.len = new_len;
+                } else {
+                    self.truncate(new_len);
+                }
+                volatile_zero(core::slice::from_mut(&mut value));
+                Ok(())
+            }
+
+            /// 将容器长度调整为 `new_len`，新增元素以全零（`T::ZERO`）初始化；若缩短则清零被截断尾部。
+            ///
+            /// # Errors
+            ///
+            /// - 当 `new_len > N` 时返回 [`ErrType::CapacityExceeded`]，容器内容不变。
+            #[inline]
+            pub fn resize_zeroed(&mut self, new_len: usize) -> BufferResult {
+                self.resize(new_len, T::ZERO)
+            }
+
+            /// 在容器末尾追加 `added_len` 个全零元素（`T::ZERO`）。
+            ///
+            /// # Errors
+            ///
+            /// - 当追加后总长度超出容量时返回 [`ErrType::CapacityExceeded`]，容器内容不变。
+            #[inline]
+            pub fn extend_zeroed(&mut self, added_len: usize) -> BufferResult {
+                let new_len = self.len.checked_add(added_len).ok_or_else(|| {
+                    err!(ErrType::CapacityExceeded {
+                        requested: usize::MAX,
+                        max: N,
+                    })
+                })?;
+                self.resize_zeroed(new_len)
             }
 
             /// 以不可变切片查看已写入数据。
@@ -785,7 +946,7 @@ macro_rules! impl_secure_buffer {
             #[cfg_attr(all(not(coin101), coin53), inline(always))]
             #[cfg_attr(all(not(coin101), not(coin53)), inline)]
             pub fn wipe_data(&mut self) {
-                volatile_zero(&mut self.data[..]);
+                volatile_zero(self.as_mut_slice());
                 self.len = 0;
             }
 
@@ -969,11 +1130,39 @@ macro_rules! impl_secure_buffer {
             fn len(&self) -> usize {
                 self.len()
             }
+            #[inline]
+            fn remaining_capacity(&self) -> usize {
+                self.remaining_capacity()
+            }
             #[cfg_attr(all(coin39, coin106), cold)]
             #[cfg_attr(any(coin15, coin114), inline(never))]
             #[cfg_attr(not(any(coin15, coin114)), inline(always))]
             fn is_empty(&self) -> bool {
                 self.is_empty()
+            }
+            #[inline]
+            fn truncate(&mut self, new_len: usize) {
+                self.truncate(new_len);
+            }
+            #[inline]
+            fn pop(&mut self) -> Option<T> {
+                self.pop()
+            }
+            #[inline]
+            fn push(&mut self, value: T) -> BufferResult {
+                self.push(value)
+            }
+            #[inline]
+            fn resize(&mut self, new_len: usize, value: T) -> BufferResult {
+                self.resize(new_len, value)
+            }
+            #[inline]
+            fn resize_zeroed(&mut self, new_len: usize) -> BufferResult {
+                self.resize_zeroed(new_len)
+            }
+            #[inline]
+            fn extend_zeroed(&mut self, added_len: usize) -> BufferResult {
+                self.extend_zeroed(added_len)
             }
             #[cfg_attr(coin27, cold)]
             #[cfg_attr(all(coin94, coin6), inline(never))]
@@ -1055,8 +1244,8 @@ macro_rules! impl_secure_buffer {
 ///
 /// 需要启用 `"types-buffer"` 特性。
 pub struct StackBuffer<T: ZeroablePrimitive, const N: usize> {
-    len: usize,
-    data: [T; N],
+    pub(super) len: usize,
+    pub(super) data: [T; N],
 }
 
 impl<T: ZeroablePrimitive, const N: usize> StackBuffer<T, N> {
@@ -1093,8 +1282,8 @@ pub type StackU64<const N: usize> = StackBuffer<u64, N>;
 /// 需要启用 `"types-buffer"` 与 `"alloc"` 特性。
 #[cfg(feature = "alloc")]
 pub struct HeapBuffer<T: ZeroablePrimitive, const N: usize> {
-    len: usize,
-    data: alloc::boxed::Box<[T; N]>,
+    pub(super) len: usize,
+    pub(super) data: alloc::boxed::Box<[T; N]>,
 }
 
 #[cfg(feature = "alloc")]
@@ -1421,5 +1610,67 @@ mod tests {
             .extend_from_zeroable_primitive_slice_le(&words)
             .unwrap();
         assert_eq!(le_u64.as_slice(), &[u64::from_le_bytes(native)]);
+    }
+
+    #[test]
+    fn test_length_adjustment_and_capacity_apis() {
+        let mut b = StackBytes::<8>::new();
+        assert_eq!(b.remaining_capacity(), 8);
+        assert_eq!(b.pop(), None);
+
+        b.push(0x11).unwrap();
+        b.push(0x22).unwrap();
+        assert_eq!(b.len(), 2);
+        assert_eq!(b.remaining_capacity(), 6);
+        assert_eq!(b.as_slice(), &[0x11, 0x22]);
+
+        b.extend_zeroed(2).unwrap();
+        assert_eq!(b.len(), 4);
+        assert_eq!(b.remaining_capacity(), 4);
+        assert_eq!(b.as_slice(), &[0x11, 0x22, 0x00, 0x00]);
+
+        b.resize(6, 0xAA).unwrap();
+        assert_eq!(b.as_slice(), &[0x11, 0x22, 0x00, 0x00, 0xAA, 0xAA]);
+        assert_eq!(b.remaining_capacity(), 2);
+
+        let err = b.resize(9, 0xFF).unwrap_err();
+        assert_eq!(
+            err.err_type(),
+            ErrType::CapacityExceeded {
+                requested: 9,
+                max: 8
+            }
+        );
+        assert_eq!(b.len(), 6);
+
+        b.resize(5, 0x00).unwrap();
+        assert_eq!(b.len(), 5);
+        assert_eq!(b.data[5], 0x00);
+
+        assert_eq!(b.pop(), Some(0xAA));
+        assert_eq!(b.len(), 4);
+        assert_eq!(b.data[4], 0x00);
+
+        b.resize(7, 0xBB).unwrap();
+        assert_eq!(&b.data[4..7], &[0xBB, 0xBB, 0xBB]);
+        b.truncate(2);
+        assert_eq!(b.len(), 2);
+        assert_eq!(&b.data[2..7], &[0u8; 5]);
+
+        b.resize_zeroed(5).unwrap();
+        assert_eq!(b.as_slice(), &[0x11, 0x22, 0x00, 0x00, 0x00]);
+
+        fn exercise_via_trait(buf: &mut impl Buffer<u8>) {
+            buf.truncate(1);
+            assert_eq!(buf.remaining_capacity(), 7);
+            buf.push(0x99).unwrap();
+            buf.extend_zeroed(2).unwrap();
+            buf.resize(6, 0x77).unwrap();
+            buf.resize_zeroed(4).unwrap();
+            assert_eq!(buf.pop(), Some(0x00));
+            assert_eq!(buf.as_slice(), &[0x11, 0x99, 0x00]);
+        }
+        exercise_via_trait(&mut b);
+        assert_eq!(&b.data[3..], &[0u8; 5]);
     }
 }

@@ -44,7 +44,7 @@ cargo add lib-unknown
 
 ```toml
 [dependencies]
-lib-unknown = "0.3"
+lib-unknown = "0.4"
 ```
 
 基本用法（需启用 `"types"` Feature）：
@@ -129,6 +129,23 @@ fn main() {
 fn main() {}
 ```
 
+#### 空白编码 HB2 / HB3（需 `"encoding"` Feature）
+
+```rust
+#[cfg(feature = "encoding")]
+fn main() {
+    use lib_unknown::encoding::hb2::{DEFAULT_TABLE, hb2_decode_to_vec, hb2_encode_to_vec};
+
+    let encoded = hb2_encode_to_vec(b"hi", DEFAULT_TABLE);
+    assert_eq!(encoded.len(), 16); // 每字节展开为 8 个二值符号
+    let decoded = hb2_decode_to_vec(&encoded, DEFAULT_TABLE);
+    assert_eq!(decoded, b"hi");
+}
+
+#[cfg(not(feature = "encoding"))]
+fn main() {}
+```
+
 ---
 
 ## 设计哲学 (Design Philosophy)
@@ -167,13 +184,13 @@ fn main() {}
 | 核心入口 / 类型 | 角色定位       | 职责说明                                                                       |
 |:----------------|:---------------|:-------------------------------------------------------------------------------|
 | **`sys`**       | 系统接口       | 裸系统调用（多架构内联汇编）与 `dlopen` / `dlsym`、Windows DLL 动态符号解析    |
-| **`rand`**      | 随机源         | 多源熵混合与 SplitMix64 / Xoshiro / CWG / ChaCha 四族 PRNG                     |
+| **`rand`**      | 随机源         | 多源熵混合与 SplitMix64 / Xoshiro / CWG / ChaCha 四族 PRNG；`std` 下默认每线程 CWG128 取数 |
 | **`crypto`**    | 密码与混淆     | RFC 8439 ChaCha20、MSE / MSE2 混淆密码、常数时间 PKCS#7 / ISO-7816 填充        |
 | **`types`**     | 安全内存       | `StackBytes` / `StackStr` / `StackCStr` 等擦除式定容容器，`ct_eq` 与跨位宽视图 |
 | **`hide`**      | 编译期混淆     | `const_random!` / `hide!` / `hide_array!` 及惰性变体                           |
 | **`lazy`**      | 惰性初始化     | 手写 `OnceLock` / `LazyLock`，支持失败重试与 panic 中毒恢复                    |
 | **`hash`**      | 轻量哈希       | 多泳道乘法链 `LightHasher` 与无 std 定容 `SHashMap`                            |
-| **`encoding`**  | 编码           | hex / base64 编解码辅助                                                        |
+| **`encoding`**  | 编码           | hex / base64 / HB2 / HB3 编解码辅助                                             |
 | **`errors`**    | 统一错误       | `Error` / `ErrType` 与 `ensure!` / `bail!` / `err!` 宏                         |
 | **`dyntest`**   | 开发期 Harness | 将代码片段生成临时 Cargo 工程并编译执行，支持超时与缓存                        |
 
@@ -199,7 +216,7 @@ fn main() {}
 | `std`             |    ❌    | `alloc`                                                       | 启用标准库；关闭 `no_std`                                          |
 | `alloc`           |    ❌    | —                                                             | 启用堆分配支持（`Box` / `Vec` 等）                                 |
 | `rand`            |    ✅    | `rand-default`, `rand-chacha`, `rand-xoshiro`, `rand-cwg`     | 全部随机数能力                                                     |
-| `rand-default`    |    ✅    | `rand-seed`, `rand-core`                                      | `rand` 的默认源组合（熵源 + 核心 trait）                           |
+| `rand-default`    |    ✅    | `rand-seed`, `rand-core`, `rand-cwg`                          | `rand` 的默认源组合（熵源 + 核心 trait + 线程级 CWG）              |
 | `rand-seed`       |    ✅    | `dep:wasm-bindgen`, `dep:wasi`                                | 微架构熵源（TSC / 寄存器签名 / 栈混合）；WASM 下按目标引入对应绑定 |
 | `rand-core`       |    ✅    | `rand-splitmix64`, `crypto-core`                              | `RngCore` / `Rng` 等核心 trait 与全局便捷接口                      |
 | `rand-splitmix64` |    ✅    | `crypto-core`                                                 | SplitMix64 生成器（含原子共享变体）                                |
@@ -223,8 +240,10 @@ fn main() {}
 | `hash-base`       |    ✅    | —                                                             | `LightHasher` 多泳道乘法链哈希                                     |
 | `hash-hashmap`    |    ✅    | `hash-base`                                                   | 无 std 定容 `SHashMap`                                             |
 | `lazy`            |    ✅    | —                                                             | 手写 `OnceLock` / `LazyLock`                                       |
-| `encoding`        |    ✅    | `encoding-hex`, `encoding-base64`                             | hex / base64 编解码                                                |
+| `encoding`        |    ✅    | `encoding-hb2`, `encoding-hb3`, `encoding-hex`, `encoding-base64` | hex / base64 / HB2 / HB3 编解码                                    |
 | `encoding-hex`    |    ✅    | —                                                             | 十六进制编解码                                                     |
+| `encoding-hb2`    |    ✅    | —                                                             | HB2 二值符号编码（每字节 8 符号，空白隐写）                        |
+| `encoding-hb3`    |    ✅    | —                                                             | HB3 三进制符号编码（每字节 6 符号，空白隐写）                      |
 | `encoding-base64` |    ✅    | —                                                             | Base64 编解码（含 URL-safe 字母表）                                |
 | `dyntest`         |    ❌    | `std`, `rand`                                                 | 动态编译运行 Harness（仅开发期）                                   |
 
@@ -305,7 +324,10 @@ cargo build --release --no-default-features \
   哈希未对齐读取、编码指针运算、MSE 混淆原语及 `hide!` 展开等受控边界使用 `unsafe`；
   绝大多数 `unsafe` 块附 `SAFETY` 前置条件注释。
 - **敏感数据擦除**：`types` 模块容器在 `Drop` 与显式 `wipe_data` 时对整块存储执行
-  `volatile` 清零，并覆盖未使用区域（详见[设计哲学](#设计哲学-design-philosophy)）。
+  `volatile` 清零，并覆盖未使用区域（详见[设计哲学](#设计哲学-design-philosophy)）；
+  `truncate` / `pop` / `push` / `resize` 等原地操作同样会立即清零被丢弃或临时副本。
+- **常量时间比较**：`types` 容器提供 `ct_eq` / `ct_eq_cstr` 等常量时间比较接口，避免逐字节
+  提前返回造成的时序侧信道；`Str` 与 `CStr` trait 均暴露对应的 `ct_eq`。
 - **漏洞披露**：提交 Issue 前请勿公开可利用细节，优先通过维护者私信协商披露流程。
 
 ---

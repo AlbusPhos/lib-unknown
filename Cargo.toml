@@ -1,6 +1,6 @@
 [package]
 name = "lib-unknown"
-version = "0.3.2"
+version = "0.4.0"
 edition = "2024"
 rust-version = "1.92"
 authors = ["AlbusPhos <owo.zzz@proton.me>"]
@@ -54,6 +54,7 @@ rand-xoshiro = ["crypto-core"]
 rand-default = [
     "rand-seed",
     "rand-core",
+    "rand-cwg",
 ]
 
 rand = [
@@ -104,8 +105,12 @@ hash = [
 lazy = []
 
 encoding-hex = []
+encoding-hb2 = []
+encoding-hb3 = []
 encoding-base64 = []
 encoding = [
+    "encoding-hb2",
+    "encoding-hb3",
     "encoding-hex",
     "encoding-base64",
 ]

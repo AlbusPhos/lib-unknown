@@ -4,7 +4,6 @@ use crate::lazy::LazyLock;
 use crate::rand::rngs::splitmix64::SplitMix64Atomic;
 #[cfg(feature = "rand-seed")]
 use crate::rand::seed::seed;
-use core::sync::atomic::{AtomicUsize, Ordering};
 
 /// 可无损转换成 128 位种子的类型集合（`u128`、`(u64, u64)`、`[u64; 2]` 等）；
 /// 由 [`RngCore::new`] 作为统一种子入口。
@@ -316,12 +315,8 @@ macro_rules! impl_sample_range_float {
 
 impl_sample_range_float!(f32, f64);
 
-/// 进程级全局 PRNG：`SplitMix64Atomic` 起源，规律性周期性再混入微架构熵/编译期种子。
-#[cfg_attr(any(coin113, coin110), cold)]
-#[cfg_attr(coin56, inline(never))]
-#[cfg_attr(all(not(coin56), coin48), inline(always))]
-pub fn next() -> u64 {
-    static C: AtomicUsize = AtomicUsize::new(1);
+#[inline(always)]
+fn next_atomic() -> u64 {
     static RNG: LazyLock<SplitMix64Atomic> = LazyLock::new(|| {
         let s = {
             #[cfg(feature = "rand-seed")]
@@ -335,49 +330,194 @@ pub fn next() -> u64 {
         };
         SplitMix64Atomic::new(s)
     });
-    let c = C.fetch_add(1, Ordering::Relaxed);
 
     let n = RNG.next_relaxed();
 
-    if c.is_multiple_of(769) || c.is_multiple_of(386) || n & 0xffff == 0 {
-        RNG.reseed({
-            #[cfg(feature = "rand-seed")]
-            {
-                seed()
-            }
-            #[cfg(not(feature = "rand-seed"))]
-            {
-                n.wrapping_mul((c as u64) | 1) ^ crate::const_random!()
-            }
-        })
+    if (n & 0x3ff) == 0x29a {
+        #[cold]
+        #[inline(never)]
+        fn reseed_slow(rng: &SplitMix64Atomic, _n: u64) {
+            rng.reseed({
+                #[cfg(feature = "rand-seed")]
+                {
+                    seed()
+                }
+                #[cfg(not(feature = "rand-seed"))]
+                {
+                    _n.wrapping_mul(crate::const_random!() | 1)
+                        ^ crate::const_random!()
+                        ^ _n.wrapping_add(crate::const_random!())
+                }
+            });
+        }
+        reseed_slow(&RNG, n);
     }
     n
 }
 
-#[derive(Clone, Copy, Default)]
+#[cfg(all(feature = "std", feature = "rand-cwg"))]
+mod global_imp {
+    use super::next_atomic;
+    use crate::rand::core::RngCore;
+    use crate::rand::rngs::cwg::Cwg128x64;
+    use core::cell::UnsafeCell;
+
+    #[inline(never)]
+    fn make_thread_seed() -> u128 {
+        let lo = next_atomic() as u128;
+        let hi = next_atomic() as u128;
+        let atomic_mix = (hi << 64) | lo;
+        #[cfg(feature = "rand-seed")]
+        {
+            atomic_mix ^ crate::rand::seed::seed128()
+        }
+        #[cfg(not(feature = "rand-seed"))]
+        {
+            atomic_mix ^ crate::const_random!()
+        }
+    }
+
+    struct TlsCwg {
+        rng: Cwg128x64,
+        cached_hi: u64,
+        /// 奇偶位 (bit 0) 标记 `cached_hi` 是否有效；满 2^24 次 (~128 MiB) 触发一次低频重播种
+        step: u32,
+    }
+
+    impl TlsCwg {
+        #[inline(never)]
+        fn new() -> Self {
+            Self {
+                rng: Cwg128x64::from_seed(make_thread_seed()),
+                cached_hi: 0,
+                step: 0,
+            }
+        }
+
+        #[cold]
+        #[inline(never)]
+        fn reseed_slow(&mut self) {
+            self.rng = Cwg128x64::from_seed(make_thread_seed());
+        }
+
+        #[inline(always)]
+        fn next_u64(&mut self) -> u64 {
+            let s = self.step;
+            self.step = s.wrapping_add(1);
+
+            if (s & 1) != 0 {
+                return self.cached_hi;
+            }
+
+            // 每 2^24 次取数（约 1677 万次 / 128 MiB）才重播种一次，开销 < 0.001%
+            if (s & 0xff_fffe) == 0xff_fffe {
+                self.reseed_slow();
+            }
+
+            let val = self.rng.next();
+            self.cached_hi = (val >> 64) as u64;
+            val as u64
+        }
+
+        #[inline(always)]
+        fn next_u128(&mut self) -> u128 {
+            self.rng.next()
+        }
+
+        #[inline(always)]
+        fn fill_bytes(&mut self, dest: &mut [u8]) {
+            self.rng.fill_bytes(dest);
+        }
+    }
+
+    std::thread_local! {
+        static TLS_RNG: UnsafeCell<TlsCwg> = UnsafeCell::new(TlsCwg::new());
+    }
+
+    #[inline(always)]
+    pub fn next_u64() -> u64 {
+        // SAFETY: `TLS_RNG` 是线程局部存储，`with` 保证当前线程独占访问；
+        // 返回引用不会逃逸出闭包，因此同一线程内不存在别名 `&mut`。
+        TLS_RNG.with(|cell| unsafe { (*cell.get()).next_u64() })
+    }
+
+    #[inline(always)]
+    pub fn next_u128() -> u128 {
+        // SAFETY: 同 `next_u64`，线程局部 `UnsafeCell` 在闭包内独占访问且引用不外泄。
+        TLS_RNG.with(|cell| unsafe { (*cell.get()).next_u128() })
+    }
+
+    #[inline(always)]
+    pub fn fill_bytes(dest: &mut [u8]) {
+        // SAFETY: 同 `next_u64`，线程局部 `UnsafeCell` 在闭包内独占访问且引用不外泄。
+        TLS_RNG.with(|cell| unsafe { (*cell.get()).fill_bytes(dest) })
+    }
+}
+
+#[cfg(not(all(feature = "std", feature = "rand-cwg")))]
+mod global_imp {
+    use super::next_atomic;
+    use crate::rand::core::RngCore;
+    use crate::rand::rngs::splitmix64::SplitMix64;
+
+    #[inline(always)]
+    pub fn next_u64() -> u64 {
+        next_atomic()
+    }
+
+    #[inline(always)]
+    pub fn next_u128() -> u128 {
+        let lo = next_atomic() as u128;
+        let hi = next_atomic() as u128;
+        (hi << 64) | lo
+    }
+
+    #[inline(always)]
+    pub fn fill_bytes(dest: &mut [u8]) {
+        if dest.len() <= 8 {
+            let bytes = next_atomic().to_le_bytes();
+            dest.copy_from_slice(&bytes[..dest.len()]);
+        } else {
+            let mut local_rng = SplitMix64::from_seed(next_atomic());
+            local_rng.fill_bytes(dest);
+        }
+    }
+}
+
+/// 进程级全局 PRNG 取数入口：启用 `std` + `rand-cwg` 时走每线程 `Cwg128x64`，
+/// 否则退回原子 `SplitMix64`；两种路径都会低概率混入微架构熵/编译期种子重播种。
+#[cfg_attr(all(not(coin56), coin48), inline(always))]
+pub fn next() -> u64 {
+    global_imp::next_u64()
+}
+
+/// 零大小全局 PRNG 句柄（实现 [`RngCore`] 与 [`Rng`]）。
 struct GlobalRng;
 
 impl From<u128> for GlobalRng {
-    #[cfg_attr(all(coin76, coin28), cold)]
-    #[cfg_attr(any(coin54, coin40), inline(never))]
     #[cfg_attr(not(any(coin54, coin40)), inline(always))]
     fn from(_: u128) -> Self {
-        unreachable!()
+        Self
     }
 }
 
 impl RngCore for GlobalRng {
-    #[cfg_attr(all(coin41, coin91), cold)]
-    #[cfg_attr(any(coin56, coin49), inline(never))]
     #[cfg_attr(not(any(coin56, coin49)), inline(always))]
     fn next_u64(&mut self) -> u64 {
-        next()
+        global_imp::next_u64()
     }
-    #[cfg_attr(any(coin47, coin97), cold)]
-    #[cfg_attr(all(coin45, coin23), inline(never))]
+
     #[cfg_attr(not(all(coin45, coin23)), inline(always))]
-    fn reseed_from(&mut self, _: u128) {
-        unreachable!()
+    fn reseed_from(&mut self, _: u128) {}
+
+    #[inline(always)]
+    fn next_u128(&mut self) -> u128 {
+        global_imp::next_u128()
+    }
+
+    #[inline(always)]
+    fn fill_bytes(&mut self, dest: &mut [u8]) {
+        global_imp::fill_bytes(dest)
     }
 }
 

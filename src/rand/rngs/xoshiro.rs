@@ -26,8 +26,6 @@ const fn seed_to_state2(seed: u128) -> [u64; 2] {
     [a as u64 | 1, b as u64 | 2]
 }
 
-#[cfg_attr(all(coin44, coin97), cold)]
-#[cfg_attr(all(coin38, coin102), inline(never))]
 #[cfg_attr(not(all(coin38, coin102)), inline(always))]
 const fn step_xoshiro256(s: &mut [u64; 4]) {
     let t = s[1] << 17;
@@ -60,10 +58,7 @@ impl Xoshiro256PlusPlus {
     }
 
     /// 推进一步（`step_xoshiro256`）并输出混合结果。`const` 可用。
-    #[cfg_attr(all(coin35, coin117), cold)]
-    #[cfg_attr(coin97, inline(never))]
     #[cfg_attr(all(not(coin97), coin57), inline(always))]
-    #[cfg_attr(all(not(coin97), not(coin57)), inline)]
     pub const fn next(&mut self) -> u64 {
         let result = self.s[0]
             .wrapping_add(self.s[3])
@@ -85,8 +80,6 @@ impl From<u128> for Xoshiro256PlusPlus {
 
 #[cfg(feature = "rand-core")]
 impl RngCore for Xoshiro256PlusPlus {
-    #[cfg_attr(coin82, cold)]
-    #[cfg_attr(all(coin79, coin102), inline(never))]
     #[cfg_attr(not(all(coin79, coin102)), inline(always))]
     fn next_u64(&mut self) -> u64 {
         self.next()
@@ -123,9 +116,7 @@ impl Xoshiro256StarStar {
         }
     }
 
-    #[cfg_attr(coin71, cold)]
-    #[cfg_attr(any(coin110, coin24), inline(never))]
-    #[cfg_attr(not(any(coin110, coin24)), inline(always))]
+    #[cfg_attr(not(any(coin24)), inline(always))]
     /// 推进一步 xoshiro256** 状态并输出 64 位结果。
     pub const fn next(&mut self) -> u64 {
         let result = self.s[1].wrapping_mul(5).rotate_left(7).wrapping_mul(9);
@@ -145,8 +136,6 @@ impl From<u128> for Xoshiro256StarStar {
 
 #[cfg(feature = "rand-core")]
 impl RngCore for Xoshiro256StarStar {
-    #[cfg_attr(all(coin3, coin47), cold)]
-    #[cfg_attr(all(coin101, coin67), inline(never))]
     #[cfg_attr(not(all(coin101, coin67)), inline(always))]
     fn next_u64(&mut self) -> u64 {
         self.next()
@@ -155,9 +144,6 @@ impl RngCore for Xoshiro256StarStar {
 
 #[cfg(feature = "rand-seed")]
 impl Default for Xoshiro256StarStar {
-    #[cfg_attr(coin41, cold)]
-    #[cfg_attr(coin16, inline(never))]
-    #[cfg_attr(all(not(coin16), coin30), inline(always))]
     #[cfg_attr(all(not(coin16), not(coin30)), inline)]
     fn default() -> Self {
         Self::from_seed(seed128())
@@ -184,8 +170,6 @@ impl Xoroshiro128PlusPlus {
         }
     }
 
-    #[cfg_attr(all(coin94, coin42), cold)]
-    #[cfg_attr(any(coin79, coin16), inline(never))]
     #[cfg_attr(not(any(coin79, coin16)), inline(always))]
     /// 推进一步 xoroshiro128++ 状态并输出 64 位结果。
     pub const fn next(&mut self) -> u64 {
@@ -211,8 +195,6 @@ impl From<u128> for Xoroshiro128PlusPlus {
 
 #[cfg(feature = "rand-core")]
 impl RngCore for Xoroshiro128PlusPlus {
-    #[cfg_attr(any(coin101, coin5), cold)]
-    #[cfg_attr(coin106, inline(never))]
     #[cfg_attr(not(coin106), inline(always))]
     fn next_u64(&mut self) -> u64 {
         self.next()
@@ -249,8 +231,6 @@ impl Xoroshiro128StarStar {
         }
     }
 
-    #[cfg_attr(coin0, cold)]
-    #[cfg_attr(coin33, inline(never))]
     #[cfg_attr(not(coin33), inline(always))]
     /// 推进一步 xoroshiro128** 状态并输出 64 位结果。
     pub const fn next(&mut self) -> u64 {
@@ -277,10 +257,7 @@ impl From<u128> for Xoroshiro128StarStar {
 
 #[cfg(feature = "rand-core")]
 impl RngCore for Xoroshiro128StarStar {
-    #[cfg_attr(all(coin124, coin69), cold)]
-    #[cfg_attr(coin29, inline(never))]
     #[cfg_attr(all(not(coin29), coin121), inline(always))]
-    #[cfg_attr(all(not(coin29), not(coin121)), inline)]
     fn next_u64(&mut self) -> u64 {
         self.next()
     }

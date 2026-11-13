@@ -33,7 +33,7 @@ pub unsafe fn resolve<T: Sized + Copy>(dylib: &str, name: &str) -> Option<T> {
     use core::ffi::c_void;
     use core::mem;
 
-    if mem::size_of::<T>() != mem::size_of::<*mut c_void>() {
+    if size_of::<T>() != size_of::<*mut c_void>() {
         return None;
     }
 
@@ -79,12 +79,6 @@ pub unsafe fn resolve<T: Sized + Copy>(dylib: &str, name: &str) -> Option<T> {
 
 #[cfg(test)]
 mod tests {
-    #[test]
-    fn test_() {
-        let _x = c"2222222";
-        let _y = r"2222222";
-    }
-
     #[test]
     fn resolve_rejects_size_mismatch() {
         // 大小不匹配时应在 dlopen 之前直接返回 None，避免 transmute_copy 越界读取。

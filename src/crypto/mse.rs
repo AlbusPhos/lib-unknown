@@ -1,13 +1,14 @@
 // SPDX-License-Identifier: MPL-2.0
 // src/crypto/mse.rs
+use crate::crypto::core::Key;
 /// 本模块实现的 MSE（及其核心变换 r8/ir8）是一种面向软件保护与载荷混淆设计的CFB模式变体的字节级分组密码。
 /// 该算法工作在 8 位数据块粒度，采用密文反馈链式结构保证扩散性。算法在轮函数中引入了基于常数逼近的定点密钥调度、
 /// 时变动态 S/P 盒置换，以及模乘逆元混合以及基于数学常数（π、1/e）构造的非线性密钥派生机制。
 /// 其底层位运算算子均经过 IEEE-754 浮点代数重构。针对符号执行求解器进行了高强度防御，但不保证侧信道安全。
 use crate::crypto::core::boxs::{DYB, gen_p, gen_s};
+use crate::crypto::core::inv_mul::inv_mul8;
 use crate::crypto::core::rotate::{f_rotate_left_u8, f_rotate_left_u64, f_rotate_right_u8};
 use crate::crypto::core::rp::rp64;
-use crate::crypto::core::{Key, inv_mul8};
 use crate::errors::*;
 
 #[cfg_attr(coin66, cold)]

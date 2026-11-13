@@ -4,6 +4,8 @@
 use crate::errors::{ErrType, Result, ensure};
 /// S/P 置换盒：`DYB` 双向查表结构、静态盒常量与 `gen_p`/`gen_s` 随机盒生成。
 pub mod boxs;
+/// 定宽模乘逆元（Newton–Raphson 精度倍增），提供 `u8`–`u128` 五种宽度。
+pub mod inv_mul;
 /// 乘法混合函数族（编译期多态实现选择）。
 pub mod mix;
 /// 常数时间填充与去填充（PKCS#7 / ISO 7816-4）。
@@ -112,15 +114,6 @@ where
         }
     }
     table
-}
-
-/// 计算 8 位模乘逆元（`m` 为奇数；零/偶数输入结果未定义，由调用方保证）。
-pub fn inv_mul8(m: u8) -> u8 {
-    let mut inv = m;
-    inv = inv.wrapping_mul(2u8.wrapping_sub(m.wrapping_mul(inv)));
-    inv = inv.wrapping_mul(2u8.wrapping_sub(m.wrapping_mul(inv)));
-    inv = inv.wrapping_mul(2u8.wrapping_sub(m.wrapping_mul(inv)));
-    inv
 }
 
 /// 长度为 `N` 字节的密钥构造 trait：让整数、数组、切片等源类型能统一进入密码原语。

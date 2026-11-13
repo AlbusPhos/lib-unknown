@@ -30,7 +30,7 @@ where
     res
 }
 
-/// 安全字符串的统一接口：只读视图，内部恒为合法 UTF-8。
+/// 安全字符串的统一接口：支持只读视图、常量时间比较、原地追加、擦除与截断，内部恒为合法 UTF-8。
 ///
 /// # Feature Requirement
 ///
@@ -49,6 +49,15 @@ where
 pub trait Str:
     ::core::ops::Deref<Target = str> + ::core::fmt::Display + ::core::fmt::Debug + Send + Sync
 {
+    /// 返回容器总容量（字节数）。
+    fn capacity(&self) -> usize;
+
+    /// 返回容器剩余可写入容量（字节数）。
+    #[inline]
+    fn remaining_capacity(&self) -> usize {
+        self.capacity().saturating_sub(self.len())
+    }
+
     /// 以 `&str` 形式查看内容。
     ///
     /// # Feature Requirement
@@ -67,6 +76,9 @@ pub trait Str:
     fn as_bytes(&self) -> &[u8] {
         self.as_str().as_bytes()
     }
+
+    /// 以常量时间（Constant-Time）比较当前字符串与 `other` 字节序列是否相等，防止时序侧信道攻击。
+    fn ct_eq(&self, other: &[u8]) -> bool;
 
     /// 类型擦除的堆克隆，用于 `Box<dyn Str>` 容器。
     ///
@@ -100,6 +112,9 @@ pub trait Str:
     fn is_empty(&self) -> bool {
         self.as_str().is_empty()
     }
+
+    /// 清零全部底层存储并将长度置 0。
+    fn wipe_data(&mut self);
 }
 
 /// 栈上定容安全字符串，`Drop` 时自动清零，适用于短口令、令牌等小敏感文本。
@@ -181,6 +196,61 @@ impl<const N: usize> HeapStr<N> {
 macro_rules! impl_secure_str_base {
     ($name:ident) => {
         impl<const N: usize> $name<N> {
+            /// 返回容器容量（字节数），恒为 `N`。
+            #[inline]
+            pub const fn capacity(&self) -> usize {
+                N
+            }
+
+            /// 返回已写入字符串的字节长度。
+            #[inline]
+            pub fn len(&self) -> usize {
+                self.0.len()
+            }
+
+            /// 返回容器剩余可写入字节容量，等于 `N - len()`。
+            #[inline]
+            pub fn remaining_capacity(&self) -> usize {
+                self.0.remaining_capacity()
+            }
+
+            /// 字符串是否为空。
+            #[inline]
+            pub fn is_empty(&self) -> bool {
+                self.0.is_empty()
+            }
+
+            /// 以 `&str` 形式查看内容（无需导入 [`Str`] trait 即可调用）。
+            #[inline]
+            pub fn as_str(&self) -> &str {
+                // SAFETY: 类型不变式保证内部字节恒为合法 UTF-8（所有写入与截断路径均维护 UTF-8 边界）。
+                unsafe { ::core::str::from_utf8_unchecked(self.0.as_slice()) }
+            }
+
+            /// 以只读字节切片 `&[u8]` 查看内容。
+            #[inline]
+            pub fn as_bytes(&self) -> &[u8] {
+                self.0.as_slice()
+            }
+
+            /// 以常量时间（Constant-Time）比较当前字符串与 `other`（如 `&str` 或 `&[u8]`）是否相等。
+            #[inline]
+            pub fn ct_eq(&self, other: impl ::core::convert::AsRef<[u8]>) -> bool {
+                self.0.ct_eq(other.as_ref())
+            }
+
+            /// 清零全部底层存储并将长度置 0。
+            #[inline]
+            pub fn wipe_data(&mut self) {
+                self.0.wipe_data();
+            }
+
+            /// 清零全部底层存储并将长度置 0（[`wipe_data`](Self::wipe_data) 的标准库风格别名）。
+            #[inline]
+            pub fn clear(&mut self) {
+                self.0.wipe_data();
+            }
+
             /// 从原始可变指针拷贝并擦除源缓冲构造安全字符串。
             ///
             /// 成功时将源 `len` 字节按 UTF-8 解析后拷贝并清零源内存。
@@ -195,7 +265,7 @@ macro_rules! impl_secure_str_base {
             ///
             /// - `ptr` 为空时返回 [`ErrType::NullPointer`]。
             /// - 源内容非合法 UTF-8 时返回 [`ErrType::InvalidUtf8`]（源仍会被清零）。
-            /// - 长度超出 `N` 时返回 [`ErrType::CapacityExceeded`]。
+            /// - 长度超出 `N` 时返回 [`ErrType::CapacityExceeded`]（源仍会被清零）。
             #[cfg_attr(coin100, cold)]
             #[cfg_attr(coin42, inline(never))]
             #[cfg_attr(not(coin42), inline(always))]
@@ -215,14 +285,70 @@ macro_rules! impl_secure_str_base {
                 Ok(out)
             }
 
+            /// 在末尾追加字符串切片 `s`。
+            ///
+            /// # Errors
+            ///
+            /// - 当追加后总字节长度超出容量 `N` 时返回 [`ErrType::CapacityExceeded`]，原内容保持不变。
             #[cfg_attr(coin62, cold)]
             #[cfg_attr(all(coin100, coin17), inline(never))]
             #[cfg_attr(not(all(coin100, coin17)), inline(always))]
-            fn try_push_str(&mut self, s: &str) -> Result<()> {
+            pub fn try_push_str(&mut self, s: &str) -> Result<()> {
                 self.0.extend_from_slice(s.as_bytes())
             }
 
-            /// 将内容搬运到容量为 `M` 的同类字符串中。
+            /// 在末尾追加单个字符 `ch`，并在追加后擦除栈上临时编码缓冲。
+            ///
+            /// # Errors
+            ///
+            /// - 当追加后总字节长度超出容量 `N` 时返回 [`ErrType::CapacityExceeded`]，原内容保持不变。
+            #[inline]
+            pub fn try_push(&mut self, ch: char) -> Result<()> {
+                let mut buf = [0u8; 4];
+                let encoded = ch.encode_utf8(&mut buf);
+                let res = self.0.extend_from_slice(encoded.as_bytes());
+                volatile_zero(&mut buf);
+                res
+            }
+
+            /// 解析可变字节切片 `buffer` 为 UTF-8 并追加到末尾，无论成功或失败均清零 `buffer`。
+            ///
+            /// # Errors
+            ///
+            /// - 当 `buffer` 非合法 UTF-8 时返回 [`ErrType::InvalidUtf8`]。
+            /// - 当追加后超出容量 `N` 时返回 [`ErrType::CapacityExceeded`]。
+            #[inline]
+            pub fn try_push_and_wipe(&mut self, buffer: &mut [u8]) -> Result<()> {
+                safe_parse_and_wipe(buffer, |s| self.try_push_str(s))
+            }
+
+            /// 移除并返回字符串末尾的最后一个字符，同时**立即清零**该字符在底层容器中的字节槽位。
+            ///
+            /// 若字符串为空则返回 `None`。
+            #[inline]
+            pub fn pop(&mut self) -> Option<char> {
+                let ch = self.as_str().chars().next_back()?;
+                let new_len = self.len() - ch.len_utf8();
+                self.0.truncate(new_len);
+                Some(ch)
+            }
+
+            /// 将字符串截断至不超过 `max_len` 的最大合法 UTF-8 字符边界，并**立即清零**被丢弃的尾部字节。
+            ///
+            /// 若 `max_len >= self.len()`，则不执行任何操作。
+            /// 该方法永不 panic，即使 `max_len` 落在多字节 UTF-8 字符内部，也会安全地向下回退至该字符起始处。
+            #[inline]
+            pub fn truncate(&mut self, max_len: usize) {
+                if max_len < self.len() {
+                    let mut boundary = max_len;
+                    while boundary > 0 && !self.as_str().is_char_boundary(boundary) {
+                        boundary -= 1;
+                    }
+                    self.0.truncate(boundary);
+                }
+            }
+
+            /// 将内容搬运到容量为 `M` 的同类字符串中，原容器随作用域结束自动 `Drop` 清零。
             ///
             /// # Feature Requirement
             ///
@@ -242,26 +368,11 @@ macro_rules! impl_secure_str_base {
             /// # Errors
             ///
             /// - 当已有长度超出 `M` 时返回 [`ErrType::CapacityExceeded`]。
-            ///
-            /// # Panics
-            ///
-            /// - 内部 `expect("Capacity already checked")`：前置长度检查保证不触发，仅防御性保留。
             #[cfg_attr(coin36, cold)]
             #[cfg_attr(coin4, inline(never))]
             #[cfg_attr(not(coin4), inline(always))]
             pub fn try_grow<const M: usize>(self) -> Result<$name<M>> {
-                if M < self.len() {
-                    bail!(ErrType::CapacityExceeded {
-                        requested: self.len(),
-                        max: M,
-                    });
-                }
-                let mut larger = $name::<M>::new();
-                larger
-                    .0
-                    .extend_from_slice(self.as_bytes())
-                    .expect("Capacity already checked");
-                Ok(larger)
+                self.0.try_grow::<M>().map($name)
             }
 
             /// 将自身与 `suffix` 拼接为容量 `M` 的新字符串。
@@ -284,25 +395,23 @@ macro_rules! impl_secure_str_base {
             /// # Errors
             ///
             /// - 当拼接后长度超出 `M` 时返回 [`ErrType::CapacityExceeded`]。
-            ///
-            /// # Panics
-            ///
-            /// - 两处内部 `unwrap`：前置长度检查保证不触发，仅防御性保留。
             #[cfg_attr(any(coin11, coin35), cold)]
             #[cfg_attr(coin113, inline(never))]
             #[cfg_attr(not(coin113), inline(always))]
             pub fn push_str_into<const M: usize>(self, suffix: &str) -> Result<$name<M>> {
-                let required_len = self.len() + suffix.len();
+                let required_len = self.len().checked_add(suffix.len()).ok_or_else(|| {
+                    err!(ErrType::CapacityExceeded {
+                        requested: usize::MAX,
+                        max: M,
+                    })
+                })?;
                 if required_len > M {
                     bail!(ErrType::CapacityExceeded {
                         requested: required_len,
                         max: M,
                     });
                 }
-                let mut larger = $name::<M>::new();
-                larger.0.extend_from_slice(self.as_bytes()).unwrap();
-                larger.0.extend_from_slice(suffix.as_bytes()).unwrap();
-                Ok(larger)
+                self.0.extend_into(suffix.as_bytes()).map($name)
             }
 
             /// 将自身与 `rhs` 拼接为容量 `M` 的新字符串（`rhs` 为任意可借用为 `str` 的类型）。
@@ -332,10 +441,7 @@ macro_rules! impl_secure_str_base {
                 self,
                 rhs: impl ::core::convert::AsRef<str>,
             ) -> Result<$name<M>> {
-                let mut new_buf = $name::<M>::new();
-                new_buf.try_push_str(self.as_str())?;
-                new_buf.try_push_str(rhs.as_ref())?;
-                Ok(new_buf)
+                self.push_str_into::<M>(rhs.as_ref())
             }
         }
 
@@ -350,13 +456,27 @@ macro_rules! impl_secure_str_base {
         }
 
         impl<const N: usize> Str for $name<N> {
+            #[inline]
+            fn capacity(&self) -> usize {
+                N
+            }
+
+            #[inline]
+            fn remaining_capacity(&self) -> usize {
+                self.remaining_capacity()
+            }
+
             #[cfg_attr(any(coin65, coin114), cold)]
             #[cfg_attr(coin111, inline(never))]
             #[cfg_attr(all(not(coin111), coin92), inline(always))]
             #[cfg_attr(all(not(coin111), not(coin92)), inline)]
             fn as_str(&self) -> &str {
-                // SAFETY: 类型不变式保证内部字节恒为合法 UTF-8（经 `try_push_str` 校验写入）。
-                unsafe { ::core::str::from_utf8_unchecked(self.0.as_slice()) }
+                self.as_str()
+            }
+
+            #[inline]
+            fn ct_eq(&self, other: &[u8]) -> bool {
+                self.0.ct_eq(other)
             }
 
             #[cfg(feature = "alloc")]
@@ -365,6 +485,11 @@ macro_rules! impl_secure_str_base {
             #[cfg_attr(not(coin9), inline(always))]
             fn dyn_clone(&self) -> alloc::boxed::Box<dyn Str> {
                 alloc::boxed::Box::new(self.clone())
+            }
+
+            #[inline]
+            fn wipe_data(&mut self) {
+                self.wipe_data();
             }
         }
 
@@ -377,6 +502,19 @@ macro_rules! impl_secure_str_base {
                 let mut new_str = Self::new();
                 let _ = new_str.0.extend_from_slice(self.as_bytes());
                 new_str
+            }
+        }
+
+        /// 支持通过 `write!(&mut s, ...)` 直接向安全字符串容器格式化写入，避免通过 `alloc::format!` 在堆上残留明文。
+        impl<const N: usize> ::core::fmt::Write for $name<N> {
+            #[inline]
+            fn write_str(&mut self, s: &str) -> ::core::fmt::Result {
+                self.try_push_str(s).map_err(|_| ::core::fmt::Error)
+            }
+
+            #[inline]
+            fn write_char(&mut self, c: char) -> ::core::fmt::Result {
+                self.try_push(c).map_err(|_| ::core::fmt::Error)
             }
         }
     };
@@ -466,7 +604,13 @@ macro_rules! impl_try_from_traits {
             #[cfg_attr(any(coin85, coin72), inline(never))]
             #[cfg_attr(not(any(coin85, coin72)), inline(always))]
             fn try_from(s: alloc::string::String) -> Result<Self, Self::Error> {
-                Self::try_from(s.into_bytes())
+                let mut bytes = s.into_bytes();
+                let mut out = Self::new();
+                // `String` 自身已保证为合法 UTF-8，直接拷贝字节并擦除原堆内存，免去二次 UTF-8 校验。
+                let res = out.0.extend_from_slice(bytes.as_slice());
+                volatile_zero(bytes.as_mut_slice());
+                res?;
+                Ok(out)
             }
         }
     };
@@ -647,30 +791,12 @@ impl<const N: usize> StackStr<N> {
     /// # Errors
     ///
     /// - 当已有长度超出 `M` 时返回 [`ErrType::CapacityExceeded`]。
-    ///
-    /// # Panics
-    ///
-    /// - 内部 `expect("Capacity checked")`：前置长度检查保证不触发，仅防御性保留。
     #[cfg_attr(any(coin59, coin18), cold)]
     #[cfg_attr(coin35, inline(never))]
     #[cfg_attr(all(not(coin35), coin93), inline(always))]
     #[cfg_attr(all(not(coin35), not(coin93)), inline)]
     pub fn into_heap<const M: usize>(self) -> Result<HeapStr<M>> {
-        if M < self.len() {
-            bail!(ErrType::CapacityExceeded {
-                requested: self.len(),
-                max: M,
-            });
-        }
-        let mut heap_str = HeapStr::<M>::new();
-        match heap_str.0.extend_from_slice(self.as_bytes()) {
-            Ok(()) => Ok(heap_str),
-            // 前置校验已保证不会走到这里；仍按容量错误处理以保持语义闭合。
-            Err(_e) => bail!(ErrType::CapacityExceeded {
-                requested: self.len(),
-                max: M,
-            }),
-        }
+        self.0.extend_into::<HeapBytes<M>>(&[]).map(HeapStr)
     }
 }
 
@@ -746,13 +872,18 @@ impl ::core::cmp::PartialEq<alloc::string::String> for alloc::boxed::Box<dyn Str
 mod tests {
     use super::*;
     #[cfg(feature = "alloc")]
-    use alloc::{boxed::Box, vec, vec::Vec};
+    use alloc::{boxed::Box, string::String, vec, vec::Vec};
     use core::convert::TryInto;
+    use core::fmt::Write;
 
     #[test]
     fn test_stack_from_str_literal() {
         let s: StackStr<8> = "hello".try_into().unwrap();
         assert_eq!(s, "hello");
+        assert!(s.ct_eq("hello"));
+        assert!(!s.ct_eq("world"));
+        assert_eq!(s.capacity(), 8);
+        assert_eq!(s.remaining_capacity(), 3);
     }
 
     #[cfg(feature = "alloc")]
@@ -760,6 +891,10 @@ mod tests {
     fn test_heap_from_str_literal() {
         let h: HeapStr<16> = "hello".try_into().unwrap();
         assert_eq!(h, "hello");
+        assert!(h.ct_eq("hello"));
+
+        let from_string = HeapStr::<16>::try_from(String::from("from_string")).unwrap();
+        assert_eq!(from_string, "from_string");
     }
 
     #[cfg(feature = "alloc")]
@@ -779,6 +914,7 @@ mod tests {
         assert_eq!(secret_list.len(), 3);
         assert!(secret_list[0].starts_with("Super"));
         assert!(secret_list[1].ends_with("Stack"));
+        assert!(secret_list[0].ct_eq(b"SuperSecret_Heap"));
     }
 
     #[cfg(feature = "alloc")]
@@ -807,5 +943,33 @@ mod tests {
         let res = StackStr::<16>::try_from(bad_utf8.as_mut_slice());
         assert!(res.is_err());
         assert_eq!(bad_utf8, [0u8; 4]);
+    }
+
+    #[test]
+    fn test_in_place_mutation_and_utf8_boundary_truncate() {
+        let mut s = StackStr::<16>::new();
+        s.try_push_str("A").unwrap();
+        s.try_push('中').unwrap(); // 3 字节 UTF-8
+        s.try_push('🦀').unwrap(); // 4 字节 UTF-8
+        assert_eq!(s.as_str(), "A中🦀");
+        assert_eq!(s.len(), 8);
+
+        // 测试 pop 弹出多字节字符并立即清零底层字节
+        assert_eq!(s.pop(), Some('🦀'));
+        assert_eq!(s.as_str(), "A中");
+        assert_eq!(s.len(), 4);
+        assert_eq!(s.0.as_slice(), "A中".as_bytes());
+
+        // 测试 truncate 在落在多字节字符中间（索引 2 位于 '中' 内部）时自动回退至合法字符边界（索引 1）
+        s.try_push('🦀').unwrap(); // "A中🦀" (len = 8)
+        s.truncate(2);
+        assert_eq!(s.as_str(), "A");
+        assert_eq!(s.len(), 1);
+
+        // 测试 fmt::Write 原地格式化写入
+        s.clear();
+        assert!(s.is_empty());
+        write!(&mut s, "pin:{}", 1234).unwrap();
+        assert_eq!(s.as_str(), "pin:1234");
     }
 }

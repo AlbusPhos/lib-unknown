@@ -1,29 +1,16 @@
 // SPDX-License-Identifier: MPL-2.0
 // src/crypto/mse2.rs
 
-use core::hint::black_box;
-
 use super::core::boxs::{DYB, P1, P2, S1, S2};
 use super::core::mix::mix64;
 use super::core::padding::{pkcs7_pad, pkcs7_unpad};
 use super::core::rotate::{f_rotate_left_u64, f_rotate_right_u64};
 use super::core::rp::{rp64, rpp64, rpp128};
 use super::core::{Key, shuffle_with};
+use crate::crypto::core::inv_mul::inv_mul64;
+use core::hint::black_box;
 
 use crate::errors::*;
-
-#[cfg_attr(coin19, cold)]
-#[cfg_attr(coin71, inline(never))]
-#[cfg_attr(not(coin71), inline(always))]
-fn inv_mul64(m: u64) -> u64 {
-    let m = m | 1;
-    let mut inv = m.wrapping_mul(3) ^ 2; // 5 bits
-    inv = inv.wrapping_mul(2u64.wrapping_sub(m.wrapping_mul(inv))); // 10 bits
-    inv = inv.wrapping_mul(2u64.wrapping_sub(m.wrapping_mul(inv))); // 20 bits
-    inv = inv.wrapping_mul(2u64.wrapping_sub(m.wrapping_mul(inv))); // 40 bits
-    inv = inv.wrapping_mul(2u64.wrapping_sub(m.wrapping_mul(inv))); // 80 >= 64 bits
-    inv
-}
 
 /// 从 `buf` 的 `offset` 处按小端读取一个 `u64`。
 ///
