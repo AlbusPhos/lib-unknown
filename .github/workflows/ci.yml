@@ -18,7 +18,7 @@ env:
 
 jobs:
   msrv:
-    name: MSRV 1.92 (fmt + clippy + no_std + test + doc)
+    name: Linux MSRV 1.92 (fmt + clippy + no_std + test + doc)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

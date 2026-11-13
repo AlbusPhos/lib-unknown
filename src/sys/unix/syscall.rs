@@ -415,15 +415,16 @@ pub mod constants {
     pub const RMDIR: usize = 137;
     pub const MMAP: usize = 197;
     pub const LSEEK: usize = 199;
-    pub const GETCWD: usize = 277;
+    // macOS 没有 `getcwd` 系统调用：libc 通过 `fcntl(fd, F_GETPATH)` 实现，
+    // 因此此处不提供 `GETCWD` 常量，避免误用为其他调用号。
     pub const KQUEUE: usize = 362;
     pub const KEVENT: usize = 363;
     pub const KEVENT64: usize = 369;
     pub const THREAD_SELFID: usize = 372; // macOS 特有的获取 TID 方式
-    pub const OPENAT: usize = 460;
-    pub const RENAMEAT: usize = 464;
-    pub const READLINKAT: usize = 467;
+    pub const OPENAT: usize = 463;
+    pub const RENAMEAT: usize = 465;
     pub const FSTATAT: usize = 469;
+    pub const READLINKAT: usize = 473;
     pub const PTRACE: usize = 26;
 }
 
@@ -572,17 +573,21 @@ pub mod ptrace_req {
     pub const PT_TRACE_ME: usize = 0;
     pub const PT_READ_I: usize = 1;
     pub const PT_READ_D: usize = 2;
+    pub const PT_READ_U: usize = 3;
     pub const PT_WRITE_I: usize = 4;
     pub const PT_WRITE_D: usize = 5;
+    pub const PT_WRITE_U: usize = 6;
     pub const PT_CONTINUE: usize = 7;
     pub const PT_KILL: usize = 8;
     pub const PT_STEP: usize = 9;
-    pub const PT_ATTACH: usize = 10;
+    pub const PT_ATTACH: usize = 10; // 已弃用，优先使用 PT_ATTACHEXC
     pub const PT_DETACH: usize = 11;
     pub const PT_SIGEXC: usize = 12;
     pub const PT_THUPDATE: usize = 13;
     pub const PT_ATTACHEXC: usize = 14;
+    pub const PT_FORCEQUOTA: usize = 30;
     pub const PT_DENY_ATTACH: usize = 31;
+    pub const PT_FIRSTMACH: usize = 32;
 }
 
 /// 系统调用返回值语义的 `Result` 别名：负值 errno 已映射为 [`ErrType::SysCallRet`]。
@@ -1250,9 +1255,14 @@ pub fn sys_execve(path: &CStr, argv: &[*const u8], envp: &[*const u8]) -> SysRes
 /// # Examples
 ///
 /// ```rust,no_run
-/// use lib_unknown::sys::unix::syscall::{ptrace_req, sys_ptrace};
+/// use lib_unknown::sys::unix::syscall::sys_ptrace;
 ///
-/// let _ = sys_ptrace(ptrace_req::PTRACE_TRACEME, 0, 0, 0);
+/// #[cfg(target_os = "macos")]
+/// use lib_unknown::sys::unix::syscall::ptrace_req::PT_TRACE_ME as TRACEME;
+/// #[cfg(not(target_os = "macos"))]
+/// use lib_unknown::sys::unix::syscall::ptrace_req::PTRACE_TRACEME as TRACEME;
+///
+/// let _ = sys_ptrace(TRACEME, 0, 0, 0);
 /// ```
 ///
 /// # Errors
@@ -1272,5 +1282,21 @@ pub fn sys_ptrace(request: usize, pid: isize, addr: usize, data: usize) -> SysRe
             addr,
             data,
         ))
+    }
+}
+
+#[cfg(all(test, target_os = "macos"))]
+mod macos_tests {
+    use super::*;
+
+    #[test]
+    fn macos_raw_syscalls_smoke() {
+        // 同时覆盖 x86_64（OPEN）与 arm64（OPENAT + AT_FDCWD）的路径。
+        assert!(sys_getpid() > 0);
+        assert!(sys_gettid() > 0);
+
+        let path = c"/dev/null";
+        let fd = sys_open(path, flags::O_RDONLY, 0).unwrap();
+        sys_close(fd).unwrap();
     }
 }

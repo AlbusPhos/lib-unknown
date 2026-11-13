@@ -194,7 +194,7 @@ pub fn probe() -> u64 {
                 options(nomem, nostack, preserves_flags)
                 );
             }
-            return freq;
+            freq
         }
 
         #[cfg(target_arch = "loongarch64")]
@@ -208,12 +208,12 @@ pub fn probe() -> u64 {
                 options(nomem, nostack, preserves_flags)
                 );
             }
-            return freq as u64;
+            freq as u64
         }
 
         #[cfg(target_arch = "wasm32")]
         {
-            return 1_000_000_000;
+            1_000_000_000
         }
 
         #[cfg(not(any(

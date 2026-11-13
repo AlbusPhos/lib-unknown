@@ -24,9 +24,14 @@
 - 修复 `Buffer::wipe_data` 只擦除 `data[..len]`、与其“清零全部底层存储”文档及 `Drop`
   行为不一致的问题；现在显式擦除会覆盖完整容量 `data[..N]`，未使用区域不再可能残留旧数据。
   代价是该操作由 O(len) 变为 O(N)，与对象销毁时的擦除成本一致。
-- 修复 macOS 平台编译：补齐 XNU 常量表中的 `ACCEPT` 与 `LSEEK` 调用号，并将 macOS
-  x86_64 内联汇编的局部标签由 `1`/`0` 改为 `2`，使 `--all-features` 在
-  `x86_64-apple-darwin` / `aarch64-apple-darwin` 下可编译。
+- 修复 macOS 平台支持：补齐 XNU 常量表的 `ACCEPT` / `LSEEK` 调用号，修正
+  `OPENAT` / `RENAMEAT` / `READLINKAT` 为正确的 BSD 系统调用号；补齐 `ptrace_req`
+  的 `PT_READ_U` / `PT_WRITE_U` / `PT_FORCEQUOTA` / `PT_FIRSTMACH`；将 macOS x86_64
+  内联汇编局部标签由 `1`/`0` 改为 `2`；`sys_ptrace` 文档示例按平台选择
+  `PT_TRACE_ME` / `PTRACE_TRACEME`，修复 macOS doctest 编译失败；新增 macOS 原生
+  syscall smoke test（`getpid` / `gettid` / `open` + `close`）。
+- **[BREAKING]** 移除 macOS 的 `constants::GETCWD`：macOS 没有 `getcwd` 系统调用
+  （libc 通过 `fcntl(F_GETPATH)` 实现），原值 `277` 实际指向 `open_extended`。
 
 
 ---
