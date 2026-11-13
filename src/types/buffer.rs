@@ -273,6 +273,18 @@ pub trait Buffer<T: ZeroablePrimitive = u8>:
     + for<'a> TryFrom<&'a [T], Error = crate::errors::Error>
     + for<'a> TryFrom<&'a mut [T], Error = crate::errors::Error>
 {
+    /// 创建初始长度为 `len`、内容全零（`T::ZERO`）的容器。
+    ///
+    /// # Errors
+    ///
+    /// - 当 `len > self.capacity()` 时返回 [`ErrType::CapacityExceeded`]。
+    #[inline]
+    fn new_zeroed(len: usize) -> BufferResult<Self> {
+        let mut buf = Self::default();
+        buf.resize_zeroed(len)?;
+        Ok(buf)
+    }
+
     /// 返回容器容量（元素个数），与已写入长度无关。
     fn capacity(&self) -> usize;
 
@@ -596,6 +608,37 @@ pub trait Buffer<T: ZeroablePrimitive = u8>:
 macro_rules! impl_secure_buffer {
     ($name:ident) => {
         impl<T: ZeroablePrimitive, const N: usize> $name<T, N> {
+            /// 创建初始长度为 `len`、内容全零（`T::ZERO`）的容器。
+            ///
+            /// 底层存储在初始化时已全零，因此仅校验容量并设置有效长度，无额外填充开销；
+            /// 对于 [`HeapBuffer`]，当 `len > N` 时会在堆分配前立即返回错误。
+            ///
+            /// # Examples
+            ///
+            /// ```rust
+            /// use lib_unknown::types::buffer::StackBytes;
+            ///
+            /// let buf = StackBytes::<8>::new_zeroed(5).unwrap();
+            /// assert_eq!(buf.len(), 5);
+            /// assert_eq!(buf.as_slice(), &[0u8; 5]);
+            /// ```
+            ///
+            /// # Errors
+            ///
+            /// - 当 `len > N` 时返回 [`ErrType::CapacityExceeded`]。
+            #[inline]
+            pub fn new_zeroed(len: usize) -> BufferResult<Self> {
+                if len > N {
+                    bail!(ErrType::CapacityExceeded {
+                        requested: len,
+                        max: N,
+                    });
+                }
+                let mut out = Self::new();
+                out.len = len;
+                Ok(out)
+            }
+
             /// 将内容搬运到容量为 `M` 的同类容器中，原容器在函数返回时自动 `Drop` 清零。
             ///
             /// # Feature Requirement
@@ -1118,6 +1161,10 @@ macro_rules! impl_secure_buffer {
         }
 
         impl<T: ZeroablePrimitive, const N: usize> Buffer<T> for $name<T, N> {
+            #[inline]
+            fn new_zeroed(len: usize) -> BufferResult<Self> {
+                Self::new_zeroed(len)
+            }
             #[cfg_attr(coin115, cold)]
             #[cfg_attr(all(coin102, coin96), inline(never))]
             #[cfg_attr(not(all(coin102, coin96)), inline(always))]
@@ -1672,5 +1719,61 @@ mod tests {
         }
         exercise_via_trait(&mut b);
         assert_eq!(&b.data[3..], &[0u8; 5]);
+    }
+    #[test]
+    fn test_new_zeroed() {
+        // 1. 正常初始化指定长度
+        let mut b = StackBytes::<8>::new_zeroed(5).unwrap();
+        assert_eq!(b.len(), 5);
+        assert_eq!(b.capacity(), 8);
+        assert_eq!(b.remaining_capacity(), 3);
+        assert_eq!(b.as_slice(), &[0u8; 5]);
+
+        // 可以直接作为可变切片写入（适合直接传给底层 I/O 或 RNG 填充）
+        b.as_mut_slice().copy_from_slice(b"hello");
+        assert_eq!(b.as_slice(), b"hello");
+
+        // 2. 边界情况：0 长度与满容量 N
+        let empty = StackU32::<4>::new_zeroed(0).unwrap();
+        assert!(empty.is_empty());
+
+        let full = StackU32::<4>::new_zeroed(4).unwrap();
+        assert_eq!(full.len(), 4);
+        assert_eq!(full.remaining_capacity(), 0);
+        assert_eq!(full.as_slice(), &[0u32; 4]);
+
+        // 3. 超出容量错误
+        let err = StackBytes::<8>::new_zeroed(9).unwrap_err();
+        assert_eq!(
+            err.err_type(),
+            ErrType::CapacityExceeded {
+                requested: 9,
+                max: 8
+            }
+        );
+
+        // 4. 通过 Buffer Trait 泛型接口调用
+        fn create_via_trait<B: Buffer<u16>>(len: usize) -> BufferResult<B> {
+            B::new_zeroed(len)
+        }
+        let via_trait: StackU16<6> = create_via_trait(4).unwrap();
+        assert_eq!(via_trait.as_slice(), &[0u16; 4]);
+
+        // 5. 堆容器测试
+        #[cfg(feature = "alloc")]
+        {
+            let hb = HeapBytes::<16>::new_zeroed(10).unwrap();
+            assert_eq!(hb.len(), 10);
+            assert_eq!(hb.as_slice(), &[0u8; 10]);
+
+            let herr = HeapBytes::<16>::new_zeroed(17).unwrap_err();
+            assert_eq!(
+                herr.err_type(),
+                ErrType::CapacityExceeded {
+                    requested: 17,
+                    max: 16
+                }
+            );
+        }
     }
 }

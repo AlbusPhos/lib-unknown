@@ -127,7 +127,7 @@ pub fn hb2_decode_to_vec(src: &[u8], table: &[u8; 2]) -> Vec<u8> {
     dest.truncate(written);
     dest
 }
-
+#[cfg(feature = "std")]
 #[cfg(test)]
 mod tests {
     use super::*;

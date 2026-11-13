@@ -13,6 +13,18 @@
 
 ## [Unreleased]
 
+### Added
+- `Buffer` trait 新增带默认实现的 `new_zeroed(len)`，用于构造“长度为 `len`、内容全零”的容器；
+  `StackBuffer` / `HeapBuffer` 提供同名固有实现，直接复用初始化时的全零存储、仅在容量校验
+  通过后设置长度（`HeapBuffer` 在 `len > N` 时于堆分配前返回错误）。
+
+### Fixed
+- 修复 `rand` 全局随机源在未启用 `rand-seed` 的构建中，`const_random!()` 默认 `u64` 与
+  `u128` 种子异或导致的类型不匹配问题（显式改用 `const_random!(u128)`）。
+- 修复 `Buffer::wipe_data` 只擦除 `data[..len]`、与其“清零全部底层存储”文档及 `Drop`
+  行为不一致的问题；现在显式擦除会覆盖完整容量 `data[..N]`，未使用区域不再可能残留旧数据。
+  代价是该操作由 O(len) 变为 O(N)，与对象销毁时的擦除成本一致。
+
 
 ---
 
