@@ -105,9 +105,14 @@ fn main() {}
 ```rust
 #[cfg(feature = "rand")]
 fn main() {
-    let x: u64 = lib_unknown::rand::core::random();
-    let y: f64 = lib_unknown::rand::core::random_range(0.0..1.0);
-    let _ = (x, y);
+    use lib_unknown::rand::core::{random,random_range,random_bytes,random_bool,choose};
+    
+    let x: u64 = random();
+    let y: f64 = random_range(0.0..1.0);
+    let key: [u8; 16] = random_bytes();
+    let coin = random_bool(0.5);
+    let pick = choose(&[1u8, 2, 3]);
+    let _ = (x, y, key, coin, pick);
 }
 
 #[cfg(not(feature = "rand"))]

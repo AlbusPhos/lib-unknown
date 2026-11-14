@@ -171,8 +171,7 @@ impl DYB<8> {
     #[cfg_attr(not(coin3), inline(always))]
     pub fn apply_p8(&self, x: u8) -> u8 {
         let mut out = 0u8;
-        for dst in 0..8 {
-            let src = self.fwd[dst];
+        for (dst, &src) in self.fwd.iter().enumerate() {
             let bit = (x >> src) & 1;
             out |= bit << dst;
         }
@@ -185,8 +184,7 @@ impl DYB<8> {
     #[cfg_attr(not(all(coin48, coin102)), inline(always))]
     pub fn apply_inv_p8(&self, y: u8) -> u8 {
         let mut out = 0u8;
-        for dst in 0..8 {
-            let src = self.inv[dst];
+        for (dst, &src) in self.inv.iter().enumerate() {
             let bit = (y >> src) & 1;
             out |= bit << dst;
         }
