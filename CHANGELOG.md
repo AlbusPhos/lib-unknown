@@ -16,6 +16,37 @@
 
 ---
 
+## [0.4.2] - 2026-11-14
+
+### Added
+- `rand::core::Rng` 新增默认方法 `random_bytes` / `random_vec` / `random_bool` / `choose` /
+  `choose_mut`，并在 `rand::core` 提供同名的进程级全局便捷函数（`random_vec` 需启用
+  `alloc` feature）。
+- 新增 `Random for char`：在全部 Unicode 标量值上均匀取值，自动跳过
+  `0xD800..=0xDFFF` 代理区。
+- 新增 `Random for [T; N]`：对定长数组逐元素独立采样。
+- `rand::core::GlobalRng` 由内部类型转为公开，并派生 `Clone` / `Copy` / `Default` /
+  `Debug`，可作为零大小句柄传给任意 `Rng` 泛型接口。
+
+### Changed
+- `rand::core` 整数区间采样改用 Lemire 乘法取高位（nearly divisionless）算法：
+  `u8`~`u64` / `usize` 及对应有符号类型的快路径不再执行除法；`u128` / `i128`
+  改为惰性阈值的取模拒绝路径。区间分布仍保持无偏。
+  注意：拒绝重试的时机随之改变，旧版本产生的确定性序列不再可复现。
+- `f32` / `f64` 的 `Random` 实现由除法改为乘以倒数常量，输出与旧版逐位一致。
+- 浮点 `Range` / `RangeInclusive` 采样改用 `(1 - r) * start + r * end` 插值，
+  避免 `end - start` 溢出（如 `-MAX..MAX`）；`Range` 额外保证不返回右开边界。
+- 内部重构：`DYB` 的 `apply_p8` / `apply_inv_p8` 改用迭代器遍历，消除 clippy
+  `needless_range_loop` 告警，行为不变。
+
+### Fixed
+- 修复 `rand` 线程级 `Cwg128x64` 的 `next_u128` 不推进计数器，导致仅使用 128 位取数的
+  场景永不触发周期重播种的问题。
+- `rand::core::fill_bytes` 在未启用 `std` 的全局源路径下对空切片直接返回，
+  不再为空缓冲区消耗一次随机数。
+
+---
+
 ## [0.4.1] - 2026-11-13
 
 ### Added
@@ -192,7 +223,8 @@
 
 ---
 
-[Unreleased]: https://github.com/AlbusPhos/lib-unknown/compare/v0.4.1...HEAD
+[Unreleased]: https://github.com/AlbusPhos/lib-unknown/compare/v0.4.2...HEAD
+[0.4.2]: https://github.com/AlbusPhos/lib-unknown/compare/v0.4.1...v0.4.2
 [0.4.1]: https://github.com/AlbusPhos/lib-unknown/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/AlbusPhos/lib-unknown/compare/v0.3.2...v0.4.0
 [0.3.2]: https://github.com/AlbusPhos/lib-unknown/compare/v0.3.1...v0.3.2
