@@ -46,7 +46,7 @@ cargo add lib-unknown
 
 ```toml
 [dependencies]
-lib-unknown = "0.4"
+lib-unknown = "0.5"
 ```
 
 基本用法（默认特性已包含 `types`）：

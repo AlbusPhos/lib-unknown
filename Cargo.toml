@@ -1,6 +1,6 @@
 [package]
 name = "lib-unknown"
-version = "0.4.2"
+version = "0.5.0"
 edition = "2024"
 rust-version = "1.92"
 authors = ["AlbusPhos <owo.zzz@proton.me>"]

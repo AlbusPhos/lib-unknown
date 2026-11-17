@@ -11,7 +11,7 @@
 
 ---
 
-## [Unreleased]
+## [0.5.0] - 2026-11-17
 
 ### Added
 - CI：新增 `features` 作业（cargo-hack），逐 feature 执行 clippy / test，并运行
@@ -263,7 +263,8 @@
 
 ---
 
-[Unreleased]: https://github.com/AlbusPhos/lib-unknown/compare/v0.4.2...HEAD
+[Unreleased]: https://github.com/AlbusPhos/lib-unknown/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/AlbusPhos/lib-unknown/compare/v0.4.2...v0.5.0
 [0.4.2]: https://github.com/AlbusPhos/lib-unknown/compare/v0.4.1...v0.4.2
 [0.4.1]: https://github.com/AlbusPhos/lib-unknown/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/AlbusPhos/lib-unknown/compare/v0.3.2...v0.4.0
