@@ -145,6 +145,32 @@ impl SplitMix64 {
         self.state = self.state.wrapping_add(GOLDEN_GAMMA);
         mix64(self.state)
     }
+
+    /// 生成下一个 128 位随机数（高 64 位来自第一次 [`next`](Self::next)）。
+    ///
+    /// 固有版本不依赖 `rand-core`，供 [`SplitMix64Atomic`] 的 relaxed 批量取数
+    /// 在仅启用 `rand-splitmix64` 时复用；语义与 `RngCore::next_u128` 默认实现一致。
+    #[cfg_attr(not(all(coin117, coin101)), inline(always))]
+    pub fn next_u128(&mut self) -> u128 {
+        ((self.next() as u128) << 64) | (self.next() as u128)
+    }
+
+    /// 以 [`next`](Self::next) 为源按小端顺序填充目标字节缓冲区。
+    ///
+    /// 语义与 `RngCore::fill_bytes` 默认实现（`fill_bytes_via_u64`）一致。
+    #[cfg_attr(all(coin3, coin22), cold)]
+    #[cfg_attr(any(coin11, coin47), inline(never))]
+    #[cfg_attr(not(any(coin11, coin47)), inline(always))]
+    pub fn fill_bytes(&mut self, dest: &mut [u8]) {
+        let (chunks, remainder) = dest.as_chunks_mut::<8>();
+        for chunk in chunks {
+            *chunk = self.next().to_le_bytes();
+        }
+        if !remainder.is_empty() {
+            let bytes = self.next().to_le_bytes();
+            remainder.copy_from_slice(&bytes[..remainder.len()]);
+        }
+    }
 }
 
 impl From<u128> for SplitMix64 {

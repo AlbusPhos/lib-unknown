@@ -1,4 +1,5 @@
 //src/hide.rs
+//! 编译期常量隐藏宏族：`const_random!` / `hide_array!` / `hide_array_lazy!`。
 
 /// 在编译期生成一个由构建种子、调用位置与构建环境共同派生的伪随机整数。
 ///
@@ -49,10 +50,7 @@ macro_rules! const_random {
             const ENVS: &[Option<&str>] = &[
                 option_env!("SCCACHE_CACHE_SIZE"),
                 option_env!("RUSTC_WRAPPER"),
-                option_env!("RUST_LOG"),
-                option_env!("RUSTFLAGS"),
-                option_env!("SHELL"),
-                option_env!("HOSTNAME"),
+                option_env!("LIB_SEED"),
             ];
             let mut idx = 0;
             while idx < ENVS.len() {
@@ -66,19 +64,9 @@ macro_rules! const_random {
     };
 }
 
-/// 单个内容混淆在::core::hint::black_box下仍然容易明文出现，不推荐使用。优先使用数组版本
-#[macro_export]
-macro_rules! hide {
-    ($t:ty, $val:expr) => {{
-        static __MASK: $t = $crate::const_random!($t);
-        static __ENC: $t = const { ($val) ^ __MASK };
-        ::core::hint::black_box(::core::hint::black_box(__ENC) ^ ::core::hint::black_box(__MASK))
-    }};
-}
-
 /// 将一个常量数组以 XOR 掩码形式存入 `.rodata`，并在运行时经 `black_box` 还原。
 ///
-/// 适用于整数数组；返回值类型为 `[$t; N]`。
+/// 适用于整数数组；返回值类型为 `[$t; N]`；const fn可用。
 #[macro_export]
 macro_rules! hide_array {
     ($t:ty, [$($val:expr),+ $(,)?]) => {{
@@ -117,24 +105,6 @@ macro_rules! hide_array {
         <[()]>::len(&[ $( $crate::hide_array!(@unit $val) ),+ ])
     };
     (@unit $val:expr) => { () };
-}
-
-/// 声明一个以 [`hide!`] 初始化、首次访问才还原的 `static LazyLock<T>`。
-///
-/// 需要启用 `"lazy"` 特性。
-#[cfg(feature = "lazy")]
-#[macro_export]
-macro_rules! hide_lazy {
-    (
-        $(#[$meta:meta])*
-        $vis:vis static $name:ident : $t:ty = $val:expr $(;)?
-    ) => {
-        $(#[$meta])*
-        $vis static $name: $crate::lazy::LazyLock<$t> = $crate::hide_lazy!($t, $val);
-    };
-    ($t:ty, $val:expr) => {
-        $crate::lazy::LazyLock::new(|| $crate::hide!($t, $val))
-    };
 }
 
 /// 声明一个以 [`hide_array!`] 初始化、首次访问才还原的 `static LazyLock<[T; N]>`。

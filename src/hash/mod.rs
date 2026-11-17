@@ -1,12 +1,16 @@
 // SPDX-License-Identifier: MPL-2.0
 
-#![cfg(feature = "hash-base")]
+#![cfg(feature = "hash-core")]
+
+use crate::hide_array_lazy;
 
 /// 无 std 定容开放寻址哈希表（线性探测）。
 #[cfg(feature = "hash-hashmap")]
 pub mod hashmap;
 
-/// 32 字节分块的多泳道乘法链哈希器（wyz 式流式，兼容 `core::hash::Hasher`）。
+hide_array_lazy!(static C : u64 = [0x9e3779b97f4a7c15, 0xbf58476d1ce4e5b9, 31, 13, 27, 41]);
+
+/// 32 字节分块的多泳道乘法链哈希器（兼容 `core::hash::Hasher`）。
 pub struct LightHasher {
     h: [u64; 4],
     buf: [u8; 32],
@@ -14,20 +18,20 @@ pub struct LightHasher {
     size: u64,
 }
 
-const C: u64 = 0x9e3779b97f4a7c15;
-
 impl LightHasher {
-    /// 以显式种子构造哈希器；`new0()` 变体使用构建期随机常量。
+    /// 以显式种子构造哈希器；
     #[cfg_attr(all(coin88, coin93), cold)]
     #[cfg_attr(any(coin100, coin31), inline(never))]
     #[cfg_attr(not(any(coin100, coin31)), inline(always))]
     pub fn new(seed: u64) -> Self {
+        hide_array_lazy!(static C : u64 = [0x85ebca6b, 0xc2b2ae35, 0x27d4eb2f]);
+        let [c1, c2, c3] = *C;
         Self {
             h: [
                 seed,
-                seed.wrapping_add(0x85ebca6b),
-                seed.wrapping_add(0xc2b2ae35),
-                seed.wrapping_add(0x27d4eb2f),
+                seed.wrapping_add(c1),
+                seed.wrapping_add(c2),
+                seed.wrapping_add(c3),
             ],
             buf: [0; 32],
             buf_len: 0,
@@ -51,16 +55,19 @@ impl LightHasher {
         }
     }
 
-    #[cfg_attr(all(coin52, coin79), cold)]
-    #[cfg_attr(coin4, inline(never))]
     #[cfg_attr(not(coin4), inline(always))]
     fn round(h: &mut [u64; 4], v: [u64; 4]) {
-        h[0] = h[0].wrapping_add(v[0]).wrapping_mul(C);
-        h[1] = h[1].wrapping_add(v[1]).wrapping_mul(C);
-        h[2] = h[2].wrapping_add(v[2]).wrapping_mul(C);
-        h[3] = h[3].wrapping_add(v[3]).wrapping_mul(C);
+        let [c1, c2, c3, _, _, _] = *C;
+        for i in 0..4 {
+            h[i] = h[i]
+                .wrapping_add(v[i].wrapping_add(c2))
+                .rotate_left(c3 as u32)
+                .wrapping_mul(c2)
+                .rotate_left(c3 as u32)
+                .wrapping_mul(c1)
+                .wrapping_mul(h[i] | 3);
+        }
     }
-
     #[cfg_attr(all(coin104, coin97), cold)]
     #[cfg_attr(all(not(coin82), coin87), inline(always))]
     #[cfg_attr(all(not(coin82), not(coin87)), inline)]
@@ -99,6 +106,23 @@ impl LightHasher {
             self.buf_len = remainder.len() as u8;
         }
     }
+
+    #[cfg_attr(any(coin100, coin31), inline(never))]
+    #[cfg_attr(not(any(coin100, coin31)), inline(always))]
+    pub fn hash_with_seed<T: core::hash::Hash + ?Sized>(val: &T, seed: u64) -> u64 {
+        use core::hash::Hasher;
+        let mut hasher = Self::new(seed);
+        val.hash(&mut hasher);
+        hasher.finish()
+    }
+    #[cfg_attr(any(coin100, coin31), inline(never))]
+    #[cfg_attr(not(any(coin100, coin31)), inline(always))]
+    pub fn hash<T: core::hash::Hash + ?Sized>(val: &T) -> u64 {
+        use core::hash::Hasher;
+        let mut hasher = Self::new(0);
+        val.hash(&mut hasher);
+        hasher.finish()
+    }
 }
 
 impl core::hash::Hasher for LightHasher {
@@ -107,6 +131,7 @@ impl core::hash::Hasher for LightHasher {
     #[cfg_attr(not(any(coin121, coin114)), inline(always))]
     fn finish(&self) -> u64 {
         let mut h = self.h;
+        let [c1, c2, c3, c4, c5, c6] = *C;
 
         if self.buf_len > 0 {
             let mut remaining = [0_u8; 32];
@@ -116,8 +141,16 @@ impl core::hash::Hasher for LightHasher {
             Self::round(&mut h, v);
         }
 
-        let combined = h[0] ^ h[1].rotate_left(13) ^ h[2].rotate_left(27) ^ h[3].rotate_left(41);
-        combined.wrapping_add(self.size).wrapping_mul(C)
+        let combined = h[0]
+            ^ h[1].rotate_left(c4 as u32)
+            ^ h[2].rotate_left(c5 as u32)
+            ^ h[3].rotate_left(c6 as u32)
+            ^ !h[0].wrapping_add(h[1].wrapping_add(h[2].wrapping_add(h[3])));
+        combined
+            .wrapping_add(self.size)
+            .wrapping_mul(c1)
+            .rotate_left(c3 as u32)
+            .wrapping_mul(c2)
     }
 
     #[cfg_attr(any(coin84, coin24), cold)]
@@ -128,8 +161,57 @@ impl core::hash::Hasher for LightHasher {
     }
 }
 
+#[derive(Clone, Copy, Default)]
+pub struct LightBuildHasher {
+    pub seed: u64,
+}
+
+impl LightBuildHasher {
+    #[inline(always)]
+    pub const fn new(seed: u64) -> Self {
+        Self { seed }
+    }
+}
+
+impl core::hash::BuildHasher for LightBuildHasher {
+    type Hasher = LightHasher;
+    #[inline(always)]
+    fn build_hasher(&self) -> Self::Hasher {
+        LightHasher::new(self.seed)
+    }
+}
 #[cfg(test)]
 mod tests {
+    use crate::hash::{LightBuildHasher, LightHasher};
+
+    #[test]
+    fn test_hash() {
+        #[derive(core::hash::Hash)]
+        struct User {
+            id: u32,
+            name: &'static str,
+        }
+        let _h1: u64 = LightHasher::hash(&42_u64);
+        let _h2: u64 = LightHasher::hash("hello world");
+        let _h3: u64 = LightHasher::hash(&[1_u8, 2, 3, 4]);
+
+        let user = User {
+            id: 1,
+            name: "Alice",
+        };
+        let _h4: u64 = LightHasher::hash_with_seed(&user, 0x1234_5678);
+
+        use core::hash::BuildHasher;
+        let builder = LightBuildHasher::new(0);
+        let _h5: u64 = builder.hash_one(&user);
+        let _h6: u64 = builder.hash_one("hello world");
+
+        assert_eq!(
+            LightHasher::hash("hello world"),
+            builder.hash_one("hello world")
+        );
+        assert_ne!(LightHasher::hash(&0), 0);
+    }
 
     #[test]
     #[cfg(feature = "std")]

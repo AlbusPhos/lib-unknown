@@ -8,6 +8,7 @@ pub mod boxs;
 pub mod inv_mul;
 /// 乘法混合函数族（编译期多态实现选择）。
 pub mod mix;
+pub mod mix2;
 /// 常数时间填充与去填充（PKCS#7 / ISO 7816-4）。
 pub mod padding;
 /// 循环左移/右移的替身实现族（基于 IEEE-754 浮点代数，规避典型 `rol`/`ror` 指令模式）。

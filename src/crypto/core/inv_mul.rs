@@ -13,7 +13,7 @@ macro_rules! impl_inv_mul {
         #[cfg_attr(coin7, cold)]
         #[cfg_attr(all(coin59, coin37), inline(never))]
         #[cfg_attr(not(all(coin59, coin37)), inline(always))]
-        pub fn $name(m: $t) -> $t {
+        pub const fn $name(m: $t) -> $t {
             let m = m | 1;
             let mut inv = m.wrapping_mul(3) ^ 2;
             let mut bits = 5u32;

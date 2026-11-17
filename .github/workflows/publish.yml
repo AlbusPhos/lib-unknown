@@ -36,6 +36,7 @@ jobs:
       - name: Install Rust stable + targets
         uses: dtolnay/rust-toolchain@stable
         with:
+          components: clippy
           targets: >-
             x86_64-unknown-linux-musl,
             i686-unknown-linux-gnu,
@@ -53,7 +54,16 @@ jobs:
             wasm32-wasip1,
             wasm32-wasip2
 
+      - name: Install cargo-hack
+        uses: taiki-e/install-action@cargo-hack
+
       - uses: Swatinem/rust-cache@v2
+
+      - name: Feature combinations check (cargo-hack)
+        run: |
+          cargo hack clippy --each-feature --locked -- -D warnings
+          cargo hack test --each-feature --locked
+          cargo hack check --feature-powerset --depth 2 --locked --skip default,rand,rand-default,sys,types,crypto,hash,encoding,dyntest
 
       - name: Test (no_std default & all-features)
         run: |

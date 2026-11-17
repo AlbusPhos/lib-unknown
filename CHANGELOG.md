@@ -13,6 +13,46 @@
 
 ## [Unreleased]
 
+### Added
+- CI：新增 `features` 作业（cargo-hack），逐 feature 执行 clippy / test，并运行
+  depth 2 的 feature powerset 检查（跳过聚合 feature）与 `wasm32-unknown-unknown` /
+  `wasm32-wasip1` 两个 WASM 目标的逐 feature 检查；发布流程同步引入同款
+  feature 组合检查（clippy / test / powerset）。
+- 新增 `crypto::core::mix2` 模块（`crypto-core`）：8 / 16 / 32 / 64 / 128 位可逆雪崩置换族
+  `mix8_2` / `mix16_2` / `mix32_2` / `mix64_2` / `mix128_2` 及对应逆函数 `inv_mix*_2`，
+  全部为 `const fn`；附带全空间双射、短周期环与雪崩统计（SAC 矩阵、汉明重量均值 / 方差）
+  测试。
+- `hash`：新增 `LightHasher::hash` / `LightHasher::hash_with_seed` 便捷函数，以及实现
+  `core::hash::BuildHasher` 的 `LightBuildHasher`（可经 `hash_one` 直接求任意
+  `Hash + ?Sized` 值）。
+- 新增 `reproducible` feature：启用后构建脚本回退为固定种子，`SEED64` / `SEED128`、
+  `coin0..coin127`、`dice0..dice9` 与 `const_random!` 输出在不同构建间保持一致，
+  用于可复现构建（默认关闭，不影响逐构建差异化行为）。
+
+### Changed
+- **[BREAKING]** 移除 `encoding::hb3` 模块与 `encoding-hb3` feature。
+- **[BREAKING]** `hash-base` feature 更名为 `hash-core`（现依赖 `lazy`）。`LightHasher`
+  的轮函数与 `finish` 混合显著强化，内部常量改为经 `hide_array_lazy!` 在编译期隐藏；
+  新版生成的哈希值与旧版不一致。
+- **[BREAKING]** 移除 `hide!` 与 `hide_lazy!` 宏：单个混淆常量在 `black_box` 下仍可能以
+  明文形态出现在符号级，统一改用数组版本 `hide_array!` / `hide_array_lazy!`；
+  `const_random!` 的构建环境熵源同步精简为 `SCCACHE_CACHE_SIZE` / `RUSTC_WRAPPER` /
+  `LIB_SEED`。
+- **[BREAKING]** `encoding::hb2` 编码输出不再与旧版逐位一致：编码前对每个字节施加基于
+  **逻辑字节索引**的扰动（移位 + 异或白化 + `mix8_2` 双射置换），相同字节在不同位置、
+  重复的输入块不再产生相同的符号序列；解码宽松模式按输出索引同步解扰，混入表外脏字节
+  仍可正确解码。`encoding-hb2` feature 现传递依赖 `crypto-core`。
+- `crypto::core::inv_mul` 全系列函数（`inv_mul8` / `inv_mul16` / `inv_mul32` /
+  `inv_mul64` / `inv_mul128`) 现为 `const fn`。
+- 文档标注 `crypto::core::mix` 可逆雪崩映射为不再推荐使用（`mix2` 为其后继），模块
+  行为未变。
+
+### Fixed
+- 修复仅启用 `rand-splitmix64`（不含 `rand-core`）的构建失败：`SplitMix64Atomic` 的
+  `next_u128_relaxed` / `fill_bytes_relaxed` 依赖的 `next_u128` / `fill_bytes` 此前仅为
+  `RngCore` trait 方法；现于 `SplitMix64` 提供语义一致的固有实现，确定性序列不变。
+- 修复 CI 逐 feature 检查暴露的 `build.rs` 与 `mix2` 测试中的
+  `needless_range_loop` 告警（改用迭代器遍历，行为不变）。
 
 ---
 

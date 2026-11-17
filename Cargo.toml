@@ -35,6 +35,7 @@ default = [
     "lazy",
     "encoding",
 ]
+reproducible = []
 std = ["alloc"]
 alloc = []
 
@@ -95,22 +96,24 @@ crypto = [
     "crypto-mse2"
 ]
 
-hash-base = []
-hash-hashmap = ["hash-base"]
+hash-core = [
+    "lazy"
+]
+hash-hashmap = ["hash-core"]
 hash = [
-    "hash-base",
+    "hash-core",
     "hash-hashmap",
 ]
 
 lazy = []
 
 encoding-hex = []
-encoding-hb2 = []
-encoding-hb3 = []
+encoding-hb2 = [
+    "crypto-core"
+]
 encoding-base64 = []
 encoding = [
     "encoding-hb2",
-    "encoding-hb3",
     "encoding-hex",
     "encoding-base64",
 ]

@@ -707,7 +707,6 @@ mod global_imp {
 #[cfg(not(all(feature = "std", feature = "rand-cwg")))]
 mod global_imp {
     use super::next_atomic;
-    use crate::rand::core::RngCore;
     use crate::rand::rngs::splitmix64::SplitMix64;
 
     #[inline(always)]

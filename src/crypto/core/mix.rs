@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MPL-2.0
-//! 可逆雪崩映射
+//! 可逆雪崩映射（未来不再推荐使用）
 
 use crate::hide_array_lazy;
 

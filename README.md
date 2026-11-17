@@ -134,7 +134,7 @@ fn main() {
 fn main() {}
 ```
 
-#### 空白编码 HB2 / HB3（需 `"encoding"` Feature）
+#### 空白编码 HB2（需 `"encoding"` Feature）
 
 ```rust
 #[cfg(feature = "encoding")]
@@ -143,7 +143,7 @@ fn main() {
 
     let mut encoded = [0u8; 16];
     let (_, n) = hb2_encode(b"hi", &mut encoded, DEFAULT_TABLE);
-    assert_eq!(n, 16); // 每字节展开为 8 个二值符号
+    assert_eq!(n, 16); // 每字节展开为 8 个二值符号（含按索引扰动的混淆）
 
     let mut decoded = [0u8; 2];
     let (_, m) = hb2_decode(&encoded[..n], &mut decoded, DEFAULT_TABLE);
@@ -166,7 +166,8 @@ fn main() {}
 2. **编译期多态，逐次构建差异化。** 构建脚本根据运行时熵生成种子，逐位派生
    `coin0..coin127`，并依据 `dice1` / `dice2` / `dice6` / `dice8` 在等价实现间轮转选择，
    改变内联策略、冷热路径、常量掩码乃至算法形态。注意：Cargo 会缓存构建脚本输出，
-   源码未变时不会重新采样。
+   源码未变时不会重新采样；如需构建间一致，可启用 `reproducible` 特性将种子与
+   全部编译期决策固定。
 3. **抗符号与特征分析的数据处理。** 常量通过 XOR 掩码在编译期加密、运行时经
    `black_box` 还原；部分位运算提供基于 IEEE-754 浮点代数的等价实现，避免
    `rol` / `xor` 等典型指令模式直出。
@@ -180,7 +181,7 @@ fn main() {}
 | 我们选择了           | 而不是         | 原因                                                                         |
 |:---------------------|:---------------|:-----------------------------------------------------------------------------|
 | 零默认依赖与自研实现 | 复用生态 crate | 减少特征、降低供应链面、便于审计，并保证无 libc 的 `no_std` 构建             |
-| 构建期随机化         | 可复现构建     | 换取函数布局、常量与实现形态的逐构建差异，用于干扰静态分析与 TLSH 等模糊哈希 |
+| 构建期随机化         | 默认可复现构建 | 换取函数布局、常量与实现形态的逐构建差异，用于干扰静态分析与 TLSH 等模糊哈希；需要可复现时可 opt-in `reproducible` 特性 |
 | `no_std` 优先        | 默认启用 `std` | 适配嵌入式、受控客户端与无 libc 环境；`std` / `alloc` 需显式开启             |
 
 ---
@@ -197,10 +198,10 @@ fn main() {}
 | [`sys`]         | **系统接口**       | 裸系统调用（多架构内联汇编）与 `dlopen` / `dlsym`、Windows DLL 动态符号解析                |
 | [`crypto`]      | **密码与混淆**     | RFC 8439 ChaCha20、MSE / MSE2 混淆密码、常数时间 PKCS#7 / ISO-7816 填充                    |
 | [`types`]       | **安全内存**       | `StackBytes` / `StackStr` / `StackCStr` 等擦除式定容容器，`ct_eq`、零拷贝转换与跨位宽视图  |
-| [`hide`]        | **编译期混淆**     | `const_random!` / `hide!` / `hide_array!` 及惰性变体                                       |
+| [`hide`]        | **编译期混淆**     | `const_random!` / `hide_array!` 及惰性变体                                                 |
 | [`lazy`]        | **惰性初始化**     | 手写 `OnceLock` / `LazyLock`，支持失败重试与 panic 中毒恢复                                |
-| [`hash`]        | **轻量哈希**       | 多泳道乘法链 `LightHasher` 与无 std 定容 `SHashMap`                                        |
-| [`encoding`]    | **编码**           | hex / base64 / HB2 / HB3 编解码辅助                                                        |
+| [`hash`]        | **轻量哈希**       | 混淆轮函数强化的 `LightHasher` 与无 std 定容 `SHashMap`                                    |
+| [`encoding`]    | **编码**           | hex / base64 / HB2 编解码辅助                                                              |
 | [`errors`]      | **统一错误**       | `Error` / `ErrType` 与 `ensure!` / `bail!` / `err!` 宏                                     |
 | [`dyntest`]     | **开发期 Harness** | 将代码片段生成临时 Cargo 工程并编译执行，支持超时与缓存                                    |
 
@@ -254,18 +255,18 @@ fn main() {}
 | `types-str`       |    ✅    | `types-buffer`                                                    | UTF-8 安全字符串容器                                               |
 | `types-cstr`      |    ✅    | `types-buffer`                                                    | NUL 结尾 C 字符串容器                                              |
 | `crypto`          |    ✅    | `crypto-core`, `crypto-mse`, `crypto-chacha20`, `crypto-mse2`     | 全部密码与混淆能力                                                 |
-| `crypto-core`     |    ✅    | `lazy`                                                            | S/P 盒、填充、置换与混合原语                                       |
+| `crypto-core`     |    ✅    | `lazy`                                                            | S/P 盒、填充、置换与混合原语（`mix` / `mix2` 可逆置换族）          |
 | `crypto-mse`      |    ✅    | `crypto-core`                                                     | MSE 第一代字节级混淆                                               |
 | `crypto-mse2`     |    ✅    | `crypto-core`                                                     | MSE2 64 字节分组混淆                                               |
 | `crypto-chacha20` |    ✅    | `crypto-core`                                                     | RFC 8439 ChaCha20                                                  |
-| `hash`            |    ✅    | `hash-base`, `hash-hashmap`                                       | 轻量哈希与定容哈希表                                               |
-| `hash-base`       |    ✅    | —                                                                 | `LightHasher` 多泳道乘法链哈希                                     |
-| `hash-hashmap`    |    ✅    | `hash-base`                                                       | 无 std 定容 `SHashMap`                                             |
+| `hash`            |    ✅    | `hash-core`, `hash-hashmap`                                       | 轻量哈希与定容哈希表                                               |
+| `hash-core`       |    ✅    | `lazy`                                                            | `LightHasher` 轻量哈希与 `BuildHasher` 便捷接口                    |
+| `hash-hashmap`    |    ✅    | `hash-core`                                                       | 无 std 定容 `SHashMap`                                             |
 | `lazy`            |    ✅    | —                                                                 | 手写 `OnceLock` / `LazyLock`                                       |
-| `encoding`        |    ✅    | `encoding-hb2`, `encoding-hb3`, `encoding-hex`, `encoding-base64` | hex / base64 / HB2 / HB3 编解码                                    |
+| `reproducible`    |    ❌    | —                                                                 | 可复现构建：种子与 `coin*` / `dice*` 编译期决策全部固定            |
+| `encoding`        |    ✅    | `encoding-hb2`, `encoding-hex`, `encoding-base64`                 | hex / base64 / HB2 编解码                                          |
 | `encoding-hex`    |    ✅    | —                                                                 | 十六进制编解码                                                     |
-| `encoding-hb2`    |    ✅    | —                                                                 | HB2 二值符号编码（每字节 8 符号，空白隐写）                        |
-| `encoding-hb3`    |    ✅    | —                                                                 | HB3 三进制符号编码（每字节 6 符号，空白隐写）                      |
+| `encoding-hb2`    |    ✅    | `crypto-core`                                                     | HB2 二值符号编码（每字节 8 符号 + 按索引扰动，空白隐写）           |
 | `encoding-base64` |    ✅    | —                                                                 | Base64 编解码（含 URL-safe 字母表）                                |
 | `dyntest`         |    ❌    | `std`, `rand`                                                     | 动态编译运行 Harness（仅开发期）                                   |
 
@@ -355,7 +356,7 @@ cargo build --release --no-default-features \
 ## 安全性 (Security)
 
 - **`unsafe` 代码政策**：`unsafe` 仅限于 syscall 内联汇编、擦除式容器、惰性初始化（`lazy`）、
-  哈希未对齐读取、编码指针运算、MSE 混淆原语及 `hide!` 展开等受控边界，相关代码块均附
+  哈希未对齐读取、编码指针运算、MSE 混淆原语及 `hide_array!` 展开等受控边界，相关代码块均附
   `SAFETY` 前置条件注释；核心公开接口的 `unsafe` 契约在 rustdoc `# Safety` 中说明。
 - **敏感数据擦除**：`types` 模块容器在 `Drop` 与显式 `wipe_data` 时对整块存储执行
   `volatile` 清零，并覆盖未使用区域（详见[设计哲学](#设计哲学-design-philosophy)）；
@@ -372,7 +373,7 @@ cargo build --release --no-default-features \
   保证不因畸形长度、非法 UTF-8 或表外字符触发未定义行为；`sys` 裸系统调用假定调用方
   已校验参数与指针有效性。
 - **构建期混淆的边界**：`coin*` / `dice*` 与 `const_random!` 用于提升静态分析与特征匹配成本，
-  不构成密钥保护，也不保证可复现构建。
+  不构成密钥保护；默认逐构建差异化、不可复现，启用 `reproducible` 特性可使构建输出固定。
 - **不在防御范围内**：MSE / MSE2 明确不保证侧信道安全；不防御内核已被攻破、物理侧信道、
   调试器或内存取证等宿主级攻击。
 

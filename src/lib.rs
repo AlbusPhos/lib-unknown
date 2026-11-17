@@ -8,7 +8,7 @@
 extern crate alloc;
 
 #[doc(hidden)]
-/// 内部模块：暴露构建期种子常量，供 `hide!` 等宏在 const 上下文中使用，不属于公开 API。
+/// 内部模块：暴露构建期种子常量，供 `const_random!` 等宏在 const 上下文中使用，不属于公开 API。
 pub mod __private {
     /// 构建期 128 位种子拼接串。
     pub const SEED: &str = env!("SEED");
@@ -66,16 +66,17 @@ pub mod lazy;
 #[cfg(any(
     feature = "encoding",
     feature = "encoding-hex",
-    feature = "encoding-base64"
+    feature = "encoding-base64",
+    feature = "encoding-hb2",
 ))]
-/// hex / base64 编码辅助。
+/// hex / base64 / hb2 编码辅助。
 pub mod encoding;
 /// 全库统一错误类型 `Error` / `ErrType` 与 `ensure!` / `bail!` / `err!` 宏。
 pub mod errors;
-#[cfg(any(feature = "hash", feature = "hash-base", feature = "hash-hashmap",))]
+#[cfg(any(feature = "hash", feature = "hash-core", feature = "hash-hashmap",))]
 /// 轻量多泳道乘法链哈希与无 std 定容哈希表。
 pub mod hash;
-/// 编译期数据与代码随机化宏族（`const_random!` / `hide!` / `hide_array!` 等）。
+/// 编译期数据与代码随机化宏族（`const_random!` / `hide_array!` / `hide_array_lazy!` 等）。
 pub mod hide;
 
 #[cfg(test)]

@@ -60,6 +60,41 @@ jobs:
         env:
           RUSTDOCFLAGS: -D warnings
 
+  features:
+    name: Feature Combinations (cargo-hack)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+          targets: wasm32-unknown-unknown, wasm32-wasip1
+
+      - name: Install cargo-hack
+        uses: taiki-e/install-action@cargo-hack
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: cargo-hack
+
+      - name: Clippy each feature individually
+        run: cargo hack clippy --each-feature --locked -- -D warnings
+
+      - name: Test each feature individually
+        run: cargo hack test --each-feature --locked
+
+      - name: Check feature powerset (depth 2)
+        run: >-
+          cargo hack check --feature-powerset --depth 2 --locked
+          --skip default,rand,rand-default,sys,types,crypto,hash,encoding,dyntest
+
+      - name: Check each feature on WASM targets
+        run: |
+          cargo hack check --each-feature --locked --target wasm32-unknown-unknown --exclude-features default,sys,sys-syscall,sys-win,sys-unix
+          cargo hack check --each-feature --locked --target wasm32-wasip1 --exclude-features default,sys,sys-syscall,sys-win,sys-unix
+
   platform:
     name: ${{ matrix.name }}
     runs-on: ${{ matrix.os }}
