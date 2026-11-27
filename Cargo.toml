@@ -17,7 +17,7 @@ members = [
 ]
 
 [workspace.package]
-version = "0.5.0"
+version = "0.6.0-rc1"
 edition = "2024"
 rust-version = "1.92"
 authors = ["AlbusPhos <owo.zzz@proton.me>"]
@@ -26,18 +26,18 @@ repository = "https://github.com/AlbusPhos/lib-unknown"
 homepage = "https://github.com/AlbusPhos"
 
 [workspace.dependencies]
-lib-unknown-seed = { path = "crates/lib-unknown-seed", version = "0.5.0", default-features = false }
-lib-unknown-lazy = { path = "crates/lib-unknown-lazy", version = "0.5.0", default-features = false }
-lib-unknown-polymorphism = { path = "crates/lib-unknown-polymorphism", version = "0.5.0", default-features = false }
-lib-unknown-errors = { path = "crates/lib-unknown-errors", version = "0.5.0", default-features = false }
-lib-unknown-hide = { path = "crates/lib-unknown-hide", version = "0.5.0", default-features = false }
-lib-unknown-crypto = { path = "crates/lib-unknown-crypto", version = "0.5.0", default-features = false }
-lib-unknown-rand = { path = "crates/lib-unknown-rand", version = "0.5.0", default-features = false }
-lib-unknown-types = { path = "crates/lib-unknown-types", version = "0.5.0", default-features = false }
-lib-unknown-sys = { path = "crates/lib-unknown-sys", version = "0.5.0", default-features = false }
-lib-unknown-hash = { path = "crates/lib-unknown-hash", version = "0.5.0", default-features = false }
-lib-unknown-encoding = { path = "crates/lib-unknown-encoding", version = "0.5.0", default-features = false }
-lib-unknown-dyntest = { path = "crates/lib-unknown-dyntest", version = "0.5.0", default-features = false }
+lib-unknown-seed = { path = "crates/lib-unknown-seed", version = "0.6.0-rc1", default-features = false }
+lib-unknown-lazy = { path = "crates/lib-unknown-lazy", version = "0.6.0-rc1", default-features = false }
+lib-unknown-polymorphism = { path = "crates/lib-unknown-polymorphism", version = "0.6.0-rc1", default-features = false }
+lib-unknown-errors = { path = "crates/lib-unknown-errors", version = "0.6.0-rc1", default-features = false }
+lib-unknown-hide = { path = "crates/lib-unknown-hide", version = "0.6.0-rc1", default-features = false }
+lib-unknown-crypto = { path = "crates/lib-unknown-crypto", version = "0.6.0-rc1", default-features = false }
+lib-unknown-rand = { path = "crates/lib-unknown-rand", version = "0.6.0-rc1", default-features = false }
+lib-unknown-types = { path = "crates/lib-unknown-types", version = "0.6.0-rc1", default-features = false }
+lib-unknown-sys = { path = "crates/lib-unknown-sys", version = "0.6.0-rc1", default-features = false }
+lib-unknown-hash = { path = "crates/lib-unknown-hash", version = "0.6.0-rc1", default-features = false }
+lib-unknown-encoding = { path = "crates/lib-unknown-encoding", version = "0.6.0-rc1", default-features = false }
+lib-unknown-dyntest = { path = "crates/lib-unknown-dyntest", version = "0.6.0-rc1", default-features = false }
 
 wasm-bindgen = { version = "0.2" }
 wasi = { version = "0.14", default-features = false }

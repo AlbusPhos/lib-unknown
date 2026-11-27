@@ -17,7 +17,6 @@ lib-unknown-errors = { workspace = true, optional = true }
 lib-unknown-hide = { workspace = true, optional = true }
 
 [dev-dependencies]
-# 只写 path：发布时该 dev-dependency 会被剥离，避免 crypto <-> rand 的发布顺序死锁。
 lib-unknown-rand = { path = "../lib-unknown-rand", default-features = false, features = ["rand-seed", "rand-core", "rand-cwg", "std"] }
 
 [features]
