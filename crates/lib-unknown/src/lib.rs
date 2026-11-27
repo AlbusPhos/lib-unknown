@@ -74,9 +74,9 @@ pub use lib_unknown_hash as hash;
 /// hex / base64 / hb2 编码辅助。详见 [`encoding`]。
 pub use lib_unknown_encoding as encoding;
 
-#[cfg(feature = "harness")]
-/// 动态编译运行 harness（仅开发期，需同时启用 `"std"`）。
-pub use lib_unknown_harness as harness;
+#[cfg(feature = "compiletest")]
+/// 动态编译并运行代码片段（仅开发期，需同时启用 `"std"`）。
+pub use lib_unknown_compiletest as compiletest;
 
 #[cfg(test)]
 mod tests {

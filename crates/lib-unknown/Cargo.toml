@@ -23,10 +23,10 @@ lib-unknown-types = { workspace = true, optional = true }
 lib-unknown-crypto = { workspace = true, optional = true }
 lib-unknown-hash = { workspace = true, optional = true }
 lib-unknown-encoding = { workspace = true, optional = true }
-lib-unknown-harness = { workspace = true, optional = true }
+lib-unknown-compiletest = { workspace = true, optional = true }
 
 [dev-dependencies]
-lib-unknown-harness = { workspace = true }
+lib-unknown-compiletest = { workspace = true }
 
 [features]
 default = [
@@ -153,8 +153,8 @@ encoding = [
     "encoding-base64",
 ]
 
-harness = [
-    "dep:lib-unknown-harness",
+compiletest = [
+    "dep:lib-unknown-compiletest",
     "std",
 ]
 

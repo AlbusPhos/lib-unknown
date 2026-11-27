@@ -204,7 +204,7 @@ fn main() {}
 | [`hash`]        | **轻量哈希**       | 混淆轮函数强化的 `LightHasher` 与无 std 定容 `SHashMap`                                    |
 | [`encoding`]    | **编码**           | hex / base64 / HB2 编解码辅助                                                              |
 | [`errors`]      | **统一错误**       | `Error` / `ErrType` 与 `ensure!` / `bail!` / `err!` 宏                                     |
-| [`harness`]     | **开发期 Harness** | 将代码片段生成临时 Cargo 工程并编译执行，支持超时与缓存                                    |
+| [`compiletest`] | **开发期编译测试** | 将代码片段生成临时 Cargo 工程并编译执行，支持超时与缓存                                    |
 
 [`rand`]: https://docs.rs/lib-unknown/latest/lib_unknown/rand/index.html
 [`sys`]: https://docs.rs/lib-unknown/latest/lib_unknown/sys/index.html
@@ -216,7 +216,7 @@ fn main() {}
 [`hash`]: https://docs.rs/lib-unknown/latest/lib_unknown/hash/index.html
 [`encoding`]: https://docs.rs/lib-unknown/latest/lib_unknown/encoding/index.html
 [`errors`]: https://docs.rs/lib-unknown/latest/lib_unknown/errors/index.html
-[`harness`]: https://docs.rs/lib-unknown/latest/lib_unknown/harness/index.html
+[`compiletest`]: https://docs.rs/lib-unknown/latest/lib_unknown/compiletest/index.html
 
 
 ---
@@ -270,7 +270,7 @@ fn main() {}
 | `encoding-hex`    |    ✅    | —                                                                                                                | 十六进制编解码                                                              |
 | `encoding-hb2`    |    ✅    | `crypto-core`                                                                                                    | HB2 二值符号编码（每字节 8 符号 + 按索引扰动，空白隐写）                    |
 | `encoding-base64` |    ✅    | —                                                                                                                | Base64 编解码（含 URL-safe 字母表）                                         |
-| `harness`         |    ❌    | `dep:lib-unknown-harness`, `std`                                                                                 | 动态编译运行 Harness（仅开发期）                                            |
+| `compiletest`     |    ❌    | `dep:lib-unknown-compiletest`, `std`                                                                             | 动态编译运行代码片段（仅开发期）                                            |
 
 最小化构建示例：
 
@@ -294,7 +294,7 @@ cargo build --release --no-default-features \
       其余受支持目标在 CI `check-targets` 与发布流程中执行交叉编译 `cargo check`。
       详见下方矩阵。
 - **`no_std` 支持**：是。默认不启用 `std`（`#![no_std]`）；开启 `std` 会传递启用 `alloc`，
-  也可单独开启 `alloc`。`types` 的 `HeapBuffer` / `HeapStr` / `HeapCStr`、`harness` 与
+  也可单独开启 `alloc`。`types` 的 `HeapBuffer` / `HeapStr` / `HeapCStr`、`compiletest` 与
   `std` 特性需要堆/标准库支持；`no_std` 环境不链接 libc。
 - **WebAssembly**：
     - `wasm32-unknown-unknown`：支持非 `sys` 模块；需使用 `--no-default-features`，

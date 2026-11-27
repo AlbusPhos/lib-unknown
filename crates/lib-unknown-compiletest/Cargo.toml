@@ -1,5 +1,5 @@
 [package]
-name = "lib-unknown-harness"
+name = "lib-unknown-compiletest"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -7,8 +7,8 @@ authors.workspace = true
 license.workspace = true
 repository.workspace = true
 homepage.workspace = true
-description = "Dynamic compile-and-run harness for lib-unknown development."
-keywords = ["testing", "harness", "cargo"]
+description = "Dynamic compile-and-run test runner for lib-unknown development."
+keywords = ["testing", "compiletest", "cargo"]
 categories = ["development-tools::testing"]
 
 [dependencies]

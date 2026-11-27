@@ -57,11 +57,11 @@ jobs:
                      lib-unknown-errors lib-unknown-hide \
                      lib-unknown-crypto lib-unknown-rand lib-unknown-types \
                      lib-unknown-sys lib-unknown-hash lib-unknown-encoding \
-                     lib-unknown-harness lib-unknown; do
+                     lib-unknown-compiletest lib-unknown; do
             cargo hack -p "$pkg" clippy --each-feature --locked -- -D warnings
           done
           cargo hack -p lib-unknown check --feature-powerset --depth 2 --locked \
-            --skip default,rand,rand-default,sys,types,crypto,hash,encoding,harness
+            --skip default,rand,rand-default,sys,types,crypto,hash,encoding,compiletest
 
       - name: Test (workspace all-features & facade default)
         run: |
@@ -80,7 +80,7 @@ jobs:
                      lib-unknown-errors lib-unknown-hide \
                      lib-unknown-crypto lib-unknown-rand lib-unknown-types \
                      lib-unknown-sys lib-unknown-hash lib-unknown-encoding \
-                     lib-unknown-harness lib-unknown; do
+                     lib-unknown-compiletest lib-unknown; do
             cargo package -p "$pkg" --locked --no-verify --list >/dev/null
           done
 
@@ -114,7 +114,7 @@ jobs:
             lib-unknown-sys
             lib-unknown-hash
             lib-unknown-encoding
-            lib-unknown-harness
+            lib-unknown-compiletest
             lib-unknown
           )
           for pkg in "${CRATES[@]}"; do
