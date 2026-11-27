@@ -14,10 +14,10 @@ categories = ["no-std"]
 [dependencies]
 
 [target.'cfg(all(target_arch = "wasm32", not(target_os = "wasi")))'.dependencies]
-wasm-bindgen = { workspace = true, default-features = false }
+wasm-bindgen = { workspace = true }
 
 [target.'cfg(all(target_arch = "wasm32", target_os = "wasi"))'.dependencies]
-wasi = { workspace = true, default-features = false  }
+wasi = { workspace = true }
 
 [package.metadata.docs.rs]
 all-features = true

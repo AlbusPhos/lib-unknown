@@ -39,5 +39,5 @@ lib-unknown-hash = { path = "crates/lib-unknown-hash", version = "0.6.0-rc1", de
 lib-unknown-encoding = { path = "crates/lib-unknown-encoding", version = "0.6.0-rc1", default-features = false }
 lib-unknown-dyntest = { path = "crates/lib-unknown-dyntest", version = "0.6.0-rc1", default-features = false }
 
-wasm-bindgen = { version = "0.2" }
+wasm-bindgen = { version = "0.2", default-features = false }
 wasi = { version = "0.14", default-features = false }

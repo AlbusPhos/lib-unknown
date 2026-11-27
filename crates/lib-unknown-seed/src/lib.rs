@@ -215,6 +215,19 @@ pub fn probe() -> u64 {
         {
             1_000_000_000
         }
+        #[cfg(all(target_arch = "arm", target_feature = "v7"))]
+        {
+            let freq: u32;
+            // SAFETY: 读取 ARMv7 Generic Timer 频率寄存器 CNTFRQ。
+            unsafe {
+                core::arch::asm!(
+                "mrc p15, 0, {}, c14, c0, 0",
+                out(reg) freq,
+                options(nomem, nostack, preserves_flags)
+                );
+            }
+            freq as u64
+        }
 
         #[cfg(not(any(
             target_arch = "aarch64",
