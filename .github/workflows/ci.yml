@@ -22,42 +22,31 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - name: Install Rust 1.92
         uses: dtolnay/rust-toolchain@1.92.0
         with:
           components: rustfmt, clippy
-
       - uses: Swatinem/rust-cache@v2
         with:
           key: msrv-1.92
-
       - name: rustfmt
         run: cargo fmt --all -- --check
-
       - name: clippy (workspace default)
         run: cargo clippy --workspace --all-targets --locked -- -D warnings
-
       - name: check (workspace, no default features)
         run: cargo check --workspace --no-default-features --locked
-
       - name: check (facade no_std + alloc feature set)
         run: >-
           cargo check -p lib-unknown --no-default-features --locked
           --features alloc,rand,sys,types,crypto,hash,lazy,encoding
-
       - name: clippy (workspace all-features)
         run: cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
-
       - name: test (workspace all-features, includes doctests)
         run: cargo test --workspace --all-features --locked
-
       - name: test (facade default features)
         run: cargo test -p lib-unknown --locked
-
       - name: test (facade, no default features)
         run: cargo test -p lib-unknown --no-default-features --locked
-
       - name: doc (workspace, deny warnings)
         run: cargo doc --workspace --no-deps --all-features --locked
         env:
@@ -68,60 +57,39 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy
           targets: wasm32-unknown-unknown, wasm32-wasip1
-
       - name: Install cargo-hack
         uses: taiki-e/install-action@cargo-hack
-
       - uses: Swatinem/rust-cache@v2
         with:
           key: cargo-hack
-
       - name: Clippy each feature individually
-        run: |
-          set -euo pipefail
-          for pkg in lib-unknown-polymorphism lib-unknown-seed lib-unknown-lazy \
-                     lib-unknown-errors lib-unknown-hide \
-                     lib-unknown-crypto lib-unknown-rand lib-unknown-types \
-                     lib-unknown-sys lib-unknown-hash lib-unknown-encoding \
-                     lib-unknown-compiletest lib-unknown; do
-            echo "::group::clippy $pkg"
-            cargo hack -p "$pkg" clippy --each-feature --locked -- -D warnings
-            echo "::endgroup::"
-          done
-
+        run: cargo hack --workspace clippy --each-feature --locked -- -D warnings
       - name: Test each feature individually
-        run: |
-          set -euo pipefail
-          for pkg in lib-unknown-polymorphism lib-unknown-errors \
-                     lib-unknown-hide \
-                     lib-unknown-rand lib-unknown-types \
-                     lib-unknown-sys lib-unknown-hash lib-unknown-encoding \
-                     lib-unknown-crypto lib-unknown; do
-            echo "::group::test $pkg"
-            cargo hack -p "$pkg" test --each-feature --locked
-            echo "::endgroup::"
-          done
-
+        run: >-
+          cargo hack --workspace
+          --exclude lib-unknown-seed
+          --exclude lib-unknown-lazy
+          --exclude lib-unknown-compiletest
+          test --each-feature --locked
       - name: Check facade feature powerset (depth 2)
         run: >-
           cargo hack -p lib-unknown check --feature-powerset --depth 2 --locked
           --skip default,rand,rand-default,sys,types,crypto,hash,encoding,compiletest
-
       - name: Check WASM targets
         run: |
           set -euo pipefail
-          cargo hack -p lib-unknown check --each-feature --locked \
-            --target wasm32-unknown-unknown \
-            --exclude-features default,sys,sys-syscall,sys-win,sys-unix
-          cargo hack -p lib-unknown check --each-feature --locked \
-            --target wasm32-wasip1 \
-            --exclude-features default,sys,sys-syscall,sys-win,sys-unix
+          for target in wasm32-unknown-unknown wasm32-wasip1; do
+            echo "::group::Checking $target each-feature"
+            cargo hack -p lib-unknown check --each-feature --locked \
+              --target "$target" \
+              --exclude-features default,sys,sys-syscall,sys-win,sys-unix,compiletest
+            echo "::endgroup::"
+          done
 
   platform:
     name: ${{ matrix.name }}
@@ -145,22 +113,17 @@ jobs:
             target: aarch64-apple-darwin
     steps:
       - uses: actions/checkout@v4
-
       - name: Install Rust stable + target
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
-
       - uses: Swatinem/rust-cache@v2
         with:
           key: ${{ matrix.target }}
-
       - name: test (facade default)
         run: cargo test -p lib-unknown --locked --target ${{ matrix.target }}
-
-      - name: test (facade all-features, includes doctests)
-        run: cargo test -p lib-unknown --all-features --locked --target ${{ matrix.target }}
-
+      - name: test (workspace all-features, includes doctests)
+        run: cargo test --workspace --all-features --locked --target ${{ matrix.target }}
       - name: doc (facade, deny warnings)
         run: cargo doc -p lib-unknown --no-deps --all-features --locked --target ${{ matrix.target }}
         env:
@@ -171,7 +134,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - name: Install Rust stable + cross targets
         uses: dtolnay/rust-toolchain@stable
         with:
@@ -180,6 +142,9 @@ jobs:
             i686-unknown-linux-gnu,
             aarch64-unknown-linux-gnu,
             riscv64gc-unknown-linux-gnu,
+            loongarch64-unknown-linux-gnu,
+            powerpc64le-unknown-linux-gnu,
+            powerpc-unknown-linux-gnu,
             x86_64-linux-android,
             aarch64-linux-android,
             i686-linux-android,
@@ -188,15 +153,14 @@ jobs:
             x86_64-pc-windows-gnullvm,
             aarch64-pc-windows-msvc,
             x86_64-unknown-none,
+            riscv32imac-unknown-none-elf,
             wasm32-unknown-unknown,
             wasm32-wasip1,
             wasm32-wasip2
-
       - uses: Swatinem/rust-cache@v2
         with:
           key: cross-check-all
-
-      - name: Check full-support targets (facade, no_std & all-features)
+      - name: Check full-support targets (facade, default & all-features)
         run: |
           set -euo pipefail
           TARGETS=(
@@ -204,6 +168,7 @@ jobs:
             i686-unknown-linux-gnu
             aarch64-unknown-linux-gnu
             riscv64gc-unknown-linux-gnu
+            loongarch64-unknown-linux-gnu
             x86_64-linux-android
             aarch64-linux-android
             i686-linux-android
@@ -217,18 +182,30 @@ jobs:
             cargo check -p lib-unknown --locked --target "$target" --all-features
             echo "::endgroup::"
           done
-
-      - name: Check bare-metal target (no_std only)
-        run: >-
-          cargo check -p lib-unknown --locked --target x86_64-unknown-none
-          --no-default-features --features alloc,rand,types,crypto,hash,lazy,encoding
-
-      - name: Check non-sys targets (ARMv7 & WASM)
+      - name: Check bare-metal targets (no_std + alloc only)
+        run: |
+          set -euo pipefail
+          for target in x86_64-unknown-none riscv32imac-unknown-none-elf; do
+            echo "::group::Checking bare-metal $target"
+            cargo check -p lib-unknown --locked --target "$target" \
+              --no-default-features --features alloc,rand,types,crypto,hash,lazy,encoding
+            echo "::endgroup::"
+          done
+      - name: Check non-sys targets (ARMv7, PowerPC & WASM)
         run: |
           set -euo pipefail
           NON_SYS_FEATURES="rand,types,crypto,hash,lazy,encoding"
-          for target in armv7-linux-androideabi wasm32-unknown-unknown wasm32-wasip1 wasm32-wasip2; do
+          TARGETS=(
+            armv7-linux-androideabi
+            powerpc64le-unknown-linux-gnu
+            powerpc-unknown-linux-gnu
+            wasm32-unknown-unknown
+            wasm32-wasip1
+            wasm32-wasip2
+          )
+          for target in "${TARGETS[@]}"; do
             echo "::group::Checking $target"
-            cargo check -p lib-unknown --locked --target "$target" --no-default-features --features "$NON_SYS_FEATURES"
+            cargo check -p lib-unknown --locked --target "$target" \
+              --no-default-features --features "$NON_SYS_FEATURES"
             echo "::endgroup::"
           done

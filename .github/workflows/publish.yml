@@ -16,10 +16,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
-      - name: Check tag matches workspace version
+      - name: Check tag matches workspace and internal dependency versions
         run: |
-          TAG="${GITHUB_REF#refs/tags/v}"
+          set -euo pipefail
+          TAG="${GITHUB_REF_NAME#v}"
           VER=$(sed -n 's/^version *= *"\([^"]*\)".*/\1/p' Cargo.toml | head -1)
           echo "tag=$TAG workspace=$VER"
           if [ "$TAG" != "$VER" ]; then
@@ -30,59 +30,44 @@ jobs:
             echo "::error::Facade version should inherit workspace.package.version"
             exit 1
           fi
+          # 校验 [workspace.dependencies] 中所有 lib-unknown-* 的版本是否与 workspace 版本一致
+          MISMATCH=$(grep -E '^lib-unknown(-[a-z0-9]+)? *= *\{.*version *=' Cargo.toml | grep -v "version = \"$VER\"" || true)
+          if [ -n "$MISMATCH" ]; then
+            echo "::error::Internal workspace.dependencies version mismatch with $VER:"
+            echo "$MISMATCH"
+            exit 1
+          fi
 
   test-and-check:
     needs: verify
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
-
       - name: Install cargo-hack
         uses: taiki-e/install-action@cargo-hack
-
       - uses: Swatinem/rust-cache@v2
-
       - name: Format
         run: cargo fmt --all -- --check
-
       - name: Feature combinations check (cargo-hack)
         run: |
           set -euo pipefail
-          for pkg in lib-unknown-polymorphism lib-unknown-seed lib-unknown-lazy \
-                     lib-unknown-errors lib-unknown-hide \
-                     lib-unknown-crypto lib-unknown-rand lib-unknown-types \
-                     lib-unknown-sys lib-unknown-hash lib-unknown-encoding \
-                     lib-unknown-compiletest lib-unknown; do
-            cargo hack -p "$pkg" clippy --each-feature --locked -- -D warnings
-          done
+          cargo hack --workspace clippy --each-feature --locked -- -D warnings
           cargo hack -p lib-unknown check --feature-powerset --depth 2 --locked \
             --skip default,rand,rand-default,sys,types,crypto,hash,encoding,compiletest
-
       - name: Test (workspace all-features & facade default)
         run: |
           cargo test --workspace --all-features --locked
           cargo test -p lib-unknown --locked
-
       - name: Doc build (deny warnings)
         run: cargo doc --workspace --no-deps --all-features --locked
         env:
           RUSTDOCFLAGS: -D warnings
-
-      - name: Package check
-        run: |
-          set -euo pipefail
-          for pkg in lib-unknown-polymorphism lib-unknown-seed lib-unknown-lazy \
-                     lib-unknown-errors lib-unknown-hide \
-                     lib-unknown-crypto lib-unknown-rand lib-unknown-types \
-                     lib-unknown-sys lib-unknown-hash lib-unknown-encoding \
-                     lib-unknown-compiletest lib-unknown; do
-            cargo package -p "$pkg" --locked --no-verify --list >/dev/null
-          done
+      - name: Package & verify workspace (dry-run)
+        run: cargo publish --workspace --dry-run --locked
 
   publish-crates:
     needs: test-and-check
@@ -94,51 +79,10 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
-
       - uses: rust-lang/crates-io-auth-action@v1
         id: auth
-
-      - name: Publish workspace crates in dependency order
-        run: |
-          set -euo pipefail
-          VER="${GITHUB_REF_NAME#v}"
-          CRATES=(
-            lib-unknown-polymorphism
-            lib-unknown-seed
-            lib-unknown-lazy
-            lib-unknown-errors
-            lib-unknown-hide
-            lib-unknown-crypto
-            lib-unknown-rand
-            lib-unknown-types
-            lib-unknown-sys
-            lib-unknown-hash
-            lib-unknown-encoding
-            lib-unknown-compiletest
-            lib-unknown
-          )
-          for pkg in "${CRATES[@]}"; do
-            echo "::group::publish $pkg $VER"
-            if cargo info "${pkg}@${VER}" >/dev/null 2>&1; then
-              echo "$pkg $VER already published, skipping"
-            else
-              ok=0
-              for attempt in 1 2 3 4 5; do
-                if cargo publish -p "$pkg" --locked; then
-                  ok=1
-                  break
-                fi
-                echo "publish $pkg failed (attempt $attempt); waiting for registry propagation"
-                sleep 30
-              done
-              if [ "$ok" != "1" ]; then
-                echo "::error::Failed to publish $pkg $VER"
-                exit 1
-              fi
-            fi
-            echo "::endgroup::"
-            sleep 15
-          done
+      - name: Publish workspace crates
+        run: cargo publish --workspace --locked --no-verify
         env:
           CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
 
@@ -152,14 +96,12 @@ jobs:
         with:
           fetch-depth: 0
           fetch-tags: true
-
       - name: Extract changelog section
         shell: bash
         run: |
           set -euo pipefail
           VERSION="${GITHUB_REF_NAME#v}"
           PREV_TAG=$(git describe --tags --abbrev=0 "${GITHUB_REF_NAME}^" 2>/dev/null || true)
-
           awk -v ver="$VERSION" '
             index($0, "## [" ver "]") == 1 { found = 1; next }
             found && (/^## \[/ || /^\[[^]]+\]:/ || /^---[[:space:]]*$/) { exit }
@@ -171,7 +113,6 @@ jobs:
               for (i = start; i <= n; i++) print lines[i]
             }
           ' CHANGELOG.md > release-notes.md
-
           if [ -s release-notes.md ]; then
             echo "Using CHANGELOG entry for $VERSION"
           else
@@ -184,7 +125,6 @@ jobs:
                 "$GITHUB_REPOSITORY" "$GITHUB_REF_NAME" > release-notes.md
             fi
           fi
-
       - name: Upload to GitHub Release
         uses: softprops/action-gh-release@v2
         with:

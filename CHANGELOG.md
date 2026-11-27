@@ -35,7 +35,7 @@
   cfg 体系；原手写 `cfg_attr` 多态逻辑统一改为 `poly_attr!`，结构化分支改为
   `poly_branch!` / `poly_select!`。`const_random!` 从 `lib-unknown-hide` 迁入
   `lib-unknown-polymorphism`，并由 hide / 门面重导出。
-- 仅控制内联 / `#[cold]` 的 356 处 `poly_attr` 进一步收敛为 `#[poly(...)]`：
+- 仅控制内联 / `#[cold]` 的 300+ 处 `poly_attr` 进一步收敛为 `#[poly(...)]`：
   热路径小函数使用高内联概率且 `cold = 0`，函数体越大内联概率越低；初始化、生成与
   动态解析路径使用较低内联概率和 `0.05..0.15` 冷路径概率。含中性 `inline` 或空属性臂、
   无法用 `#[poly]` 等价表达的组合保留为 `poly_attr`。
