@@ -1,0 +1,25 @@
+[package]
+name = "lib-unknown-hide"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+description = "Compile-time constant hiding macros for lib-unknown."
+keywords = ["no-std", "obfuscation", "macros", "const"]
+categories = ["no-std"]
+
+[dependencies]
+lib-unknown-polymorphism = { workspace = true }
+lib-unknown-lazy = { workspace = true, optional = true }
+
+[features]
+default = []
+lazy = ["dep:lib-unknown-lazy"]
+reproducible = ["lib-unknown-polymorphism/reproducible"]
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]

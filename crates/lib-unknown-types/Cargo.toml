@@ -1,0 +1,34 @@
+[package]
+name = "lib-unknown-types"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+description = "Wiping stack/heap byte, str and CStr containers for lib-unknown."
+keywords = ["no-std", "security", "wipe", "buffer"]
+categories = ["no-std", "memory-management"]
+
+[dependencies]
+lib-unknown-polymorphism = { workspace = true }
+lib-unknown-errors = { workspace = true, optional = true }
+
+[features]
+default = []
+alloc = ["lib-unknown-errors?/alloc"]
+reproducible = ["lib-unknown-polymorphism/reproducible"]
+
+types-buffer = ["dep:lib-unknown-errors" ]
+types-str = ["types-buffer"]
+types-cstr = ["types-buffer"]
+types = [
+    "types-str",
+    "types-buffer",
+    "types-cstr",
+]
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]

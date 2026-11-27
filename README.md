@@ -161,13 +161,13 @@ fn main() {}
 ### 核心原则
 
 1. **常规目标零第三方依赖，体积最小化。** 非 WASM 目标上的 `no_std` 构建不引入任何
-   `crates.io` 依赖；`wasm32-unknown-unknown` 仅在 `rand-seed` 下可选 `wasm-bindgen`，
+   `crates.io` 依赖；只有启用运行时熵源（`rand-seed` / `hash` 的 `seed`）时，
+   `wasm32-unknown-unknown` 才在 `lib-unknown-seed` 中引入 `wasm-bindgen`，
    `wasm32-wasip1` / `wasm32-wasip2` 通过 `wasi`（WASI 0.2）绑定读取单调时钟。
-2. **编译期多态，逐次构建差异化。** 构建脚本根据运行时熵生成种子，逐位派生
-   `coin0..coin127`，并依据 `dice1` / `dice2` / `dice6` / `dice8` 在等价实现间轮转选择，
-   改变内联策略、冷热路径、常量掩码乃至算法形态。注意：Cargo 会缓存构建脚本输出，
-   源码未变时不会重新采样；如需构建间一致，可启用 `reproducible` 特性将种子与
-   全部编译期决策固定。
+2. **编译期多态，逐次构建差异化。** 过程宏在编译期使用内部 Xoshiro256++ 为每个调用点
+   独立选择内联策略、冷热路径、代码分支与常量，不再依赖 `build.rs` 生成 `coin*` / `dice*`。
+   默认逐构建差异化；设置 `POLY_SEED=<任意字符串>` 或启用 `reproducible` 特性即可固定
+   全部编译期决策；`POLY_SEED` 变化会自动触发受影响 crate 重编译。
 3. **抗符号与特征分析的数据处理。** 常量通过 XOR 掩码在编译期加密、运行时经
    `black_box` 还原；部分位运算提供基于 IEEE-754 浮点代数的等价实现，避免
    `rol` / `xor` 等典型指令模式直出。
@@ -200,6 +200,7 @@ fn main() {}
 | [`types`]       | **安全内存**       | `StackBytes` / `StackStr` / `StackCStr` 等擦除式定容容器，`ct_eq`、零拷贝转换与跨位宽视图  |
 | [`hide`]        | **编译期混淆**     | `const_random!` / `hide_array!` 及惰性变体                                                 |
 | [`lazy`]        | **惰性初始化**     | 手写 `OnceLock` / `LazyLock`，支持失败重试与 panic 中毒恢复                                |
+| [`utils`]       | **配置宏**         | `cfg_if!` / `cfg_match!` 的模块入口；宏同时从 crate 根导出                                 |
 | [`hash`]        | **轻量哈希**       | 混淆轮函数强化的 `LightHasher` 与无 std 定容 `SHashMap`                                    |
 | [`encoding`]    | **编码**           | hex / base64 / HB2 编解码辅助                                                              |
 | [`errors`]      | **统一错误**       | `Error` / `ErrType` 与 `ensure!` / `bail!` / `err!` 宏                                     |
@@ -211,6 +212,7 @@ fn main() {}
 [`types`]: https://docs.rs/lib-unknown/latest/lib_unknown/types/index.html
 [`hide`]: https://docs.rs/lib-unknown/latest/lib_unknown/hide/index.html
 [`lazy`]: https://docs.rs/lib-unknown/latest/lib_unknown/lazy/index.html
+[`utils`]: https://docs.rs/lib-unknown/latest/lib_unknown/utils/index.html
 [`hash`]: https://docs.rs/lib-unknown/latest/lib_unknown/hash/index.html
 [`encoding`]: https://docs.rs/lib-unknown/latest/lib_unknown/encoding/index.html
 [`errors`]: https://docs.rs/lib-unknown/latest/lib_unknown/errors/index.html
@@ -236,39 +238,39 @@ fn main() {}
 | Feature           | 默认启用 | 依赖                                                              | 说明                                                               |
 |:------------------|:--------:|:------------------------------------------------------------------|:-------------------------------------------------------------------|
 | `default`         |    ✅    | `rand`, `sys`, `types`, `crypto`, `hash`, `lazy`, `encoding`      | 默认启用的标准特性集合                                             |
-| `std`             |    ❌    | `alloc`                                                           | 启用标准库；关闭 `no_std`                                          |
-| `alloc`           |    ❌    | —                                                                 | 启用堆分配支持（`Box` / `Vec` 等）                                 |
+| `std`             |    ❌    | `alloc`, `lib-unknown-rand?/std`                                  | 启用标准库；关闭 `no_std`                                          |
+| `alloc`           |    ❌    | `lib-unknown-errors/alloc`, `lib-unknown-rand?/alloc`, `lib-unknown-types?/alloc`, `lib-unknown-encoding?/alloc` | 启用堆分配支持（`Box` / `Vec` 等） |
 | `rand`            |    ✅    | `rand-default`, `rand-chacha`, `rand-xoshiro`, `rand-cwg`         | 全部随机数能力                                                     |
 | `rand-default`    |    ✅    | `rand-seed`, `rand-core`, `rand-cwg`                              | `rand` 的默认源组合（熵源 + 核心 trait + 线程级 CWG）              |
-| `rand-seed`       |    ✅    | `dep:wasm-bindgen`, `dep:wasi`                                    | 微架构熵源（TSC / 寄存器签名 / 栈混合）；WASM 下按目标引入对应绑定 |
-| `rand-core`       |    ✅    | `rand-splitmix64`, `crypto-core`                                  | `RngCore` / `Rng` 等核心 trait 与全局便捷接口                      |
+| `rand-seed`       |    ✅    | `lib-unknown-rand/rand-seed`, `lib-unknown-hash?/seed`            | 微架构熵源（TSC / 寄存器签名 / 栈混合）；WASM 平台绑定在 `lib-unknown-seed` |
+| `rand-core`       |    ✅    | `rand-splitmix64`, `crypto-core`, `lib-unknown-rand/rand-core`    | `RngCore` / `Rng` 等核心 trait 与全局便捷接口                      |
 | `rand-splitmix64` |    ✅    | `crypto-core`                                                     | SplitMix64 生成器（含原子共享变体）                                |
 | `rand-cwg`        |    ✅    | `crypto-core`                                                     | CWG 64 / 128 位生成器                                              |
 | `rand-chacha`     |    ✅    | `crypto-core`                                                     | ChaCha 8 / 12 / 14 / 20 轮生成器                                   |
 | `rand-xoshiro`    |    ✅    | `crypto-core`                                                     | xoshiro256 / xoroshiro128 四种变体                                 |
 | `sys`             |    ✅    | `sys-win`, `sys-unix`, `sys-syscall`                              | 全部系统接口                                                       |
-| `sys-syscall`     |    ✅    | —                                                                 | 裸 `syscall0`–`syscall6` 封装                                      |
-| `sys-win`         |    ✅    | —                                                                 | Windows DLL 动态符号解析（仅 Windows 目标编译）                    |
-| `sys-unix`        |    ✅    | —                                                                 | Unix 调用号、flags 与 `dlopen` / `dlsym` 解析（仅 Unix 目标编译）  |
+| `sys-syscall`     |    ✅    | `dep:lib-unknown-sys`, `lib-unknown-sys/sys-syscall`              | 裸 `syscall0`–`syscall6`；Unix 高层常量需同时启用 `sys-unix`       |
+| `sys-win`         |    ✅    | `dep:lib-unknown-sys`, `lib-unknown-sys/sys-win`                  | Windows DLL 动态符号解析（仅 Windows 目标编译）                    |
+| `sys-unix`        |    ✅    | `dep:lib-unknown-sys`, `lib-unknown-sys/sys-unix`                 | Unix `dlopen` / `dlsym` 解析；调用号需同时启用 `sys-syscall`        |
 | `types`           |    ✅    | `types-str`, `types-buffer`, `types-cstr`                         | 全部擦除式安全容器                                                 |
-| `types-buffer`    |    ✅    | —                                                                 | 定容字节 / 宽位宽容器（`StackBytes` / `HeapBytes` 等）             |
+| `types-buffer`    |    ✅    | `dep:lib-unknown-types`, `lib-unknown-types/types-buffer`         | 定容字节 / 宽位宽容器（`StackBytes` / `HeapBytes` 等）             |
 | `types-str`       |    ✅    | `types-buffer`                                                    | UTF-8 安全字符串容器                                               |
 | `types-cstr`      |    ✅    | `types-buffer`                                                    | NUL 结尾 C 字符串容器                                              |
 | `crypto`          |    ✅    | `crypto-core`, `crypto-mse`, `crypto-chacha20`, `crypto-mse2`     | 全部密码与混淆能力                                                 |
-| `crypto-core`     |    ✅    | `lazy`                                                            | S/P 盒、填充、置换与混合原语（`mix` / `mix2` 可逆置换族）          |
+| `crypto-core`     |    ✅    | `lazy`, `dep:lib-unknown-crypto`, `lib-unknown-crypto/crypto-core` | S/P 盒、填充、置换与混合原语（`mix` / `mix2` 可逆置换族）          |
 | `crypto-mse`      |    ✅    | `crypto-core`                                                     | MSE 第一代字节级混淆                                               |
 | `crypto-mse2`     |    ✅    | `crypto-core`                                                     | MSE2 64 字节分组混淆                                               |
 | `crypto-chacha20` |    ✅    | `crypto-core`                                                     | RFC 8439 ChaCha20                                                  |
 | `hash`            |    ✅    | `hash-core`, `hash-hashmap`                                       | 轻量哈希与定容哈希表                                               |
-| `hash-core`       |    ✅    | `lazy`                                                            | `LightHasher` 轻量哈希与 `BuildHasher` 便捷接口                    |
-| `hash-hashmap`    |    ✅    | `hash-core`                                                       | 无 std 定容 `SHashMap`                                             |
-| `lazy`            |    ✅    | —                                                                 | 手写 `OnceLock` / `LazyLock`                                       |
-| `reproducible`    |    ❌    | —                                                                 | 可复现构建：种子与 `coin*` / `dice*` 编译期决策全部固定            |
+| `hash-core`       |    ✅    | `lazy`, `dep:lib-unknown-hash`, `lib-unknown-hash/hash-core`      | `LightHasher` 轻量哈希与 `BuildHasher` 便捷接口                    |
+| `hash-hashmap`    |    ✅    | `hash-core`, `lib-unknown-hash/hash-hashmap`                      | 无 std 定容 `SHashMap`                                             |
+| `lazy`            |    ✅    | `dep:lib-unknown-lazy`, `lib-unknown-hide/lazy`                   | 手写 `OnceLock` / `LazyLock`                                       |
+| `reproducible`    |    ❌    | `lib-unknown-hide/reproducible` 及各子 crate 的 `reproducible`    | 可复现构建：过程宏随机种子与编译期决策全部固定                      |
 | `encoding`        |    ✅    | `encoding-hb2`, `encoding-hex`, `encoding-base64`                 | hex / base64 / HB2 编解码                                          |
 | `encoding-hex`    |    ✅    | —                                                                 | 十六进制编解码                                                     |
 | `encoding-hb2`    |    ✅    | `crypto-core`                                                     | HB2 二值符号编码（每字节 8 符号 + 按索引扰动，空白隐写）           |
 | `encoding-base64` |    ✅    | —                                                                 | Base64 编解码（含 URL-safe 字母表）                                |
-| `dyntest`         |    ❌    | `std`, `rand`                                                     | 动态编译运行 Harness（仅开发期）                                   |
+| `dyntest`         |    ❌    | `dep:lib-unknown-dyntest`, `std`                                  | 动态编译运行 Harness（仅开发期）                                   |
 
 最小化构建示例：
 
@@ -372,8 +374,9 @@ cargo build --release --no-default-features \
 - **信任边界**：`types` 容器、`encoding` 解码器与哈希表将任意外部字节序列视为不可信输入，
   保证不因畸形长度、非法 UTF-8 或表外字符触发未定义行为；`sys` 裸系统调用假定调用方
   已校验参数与指针有效性。
-- **构建期混淆的边界**：`coin*` / `dice*` 与 `const_random!` 用于提升静态分析与特征匹配成本，
-  不构成密钥保护；默认逐构建差异化、不可复现，启用 `reproducible` 特性可使构建输出固定。
+- **构建期混淆的边界**：过程宏多态、`poly_branch!` 与 `const_random!` 用于提升静态分析与
+  特征匹配成本，不构成密钥保护；默认逐构建差异化、不可复现，启用 `reproducible` 特性或
+  设置 `POLY_SEED` 可使编译期决策固定。
 - **不在防御范围内**：MSE / MSE2 明确不保证侧信道安全；不防御内核已被攻破、物理侧信道、
   调试器或内存取证等宿主级攻击。
 

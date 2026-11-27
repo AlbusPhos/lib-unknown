@@ -17,13 +17,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Check tag matches Cargo.toml version
+      - name: Check tag matches workspace version
         run: |
           TAG="${GITHUB_REF#refs/tags/v}"
           VER=$(sed -n 's/^version *= *"\([^"]*\)".*/\1/p' Cargo.toml | head -1)
-          echo "tag=$TAG cargo=$VER"
+          echo "tag=$TAG workspace=$VER"
           if [ "$TAG" != "$VER" ]; then
-            echo "::error::Tag v$TAG != Cargo.toml version $VER"
+            echo "::error::Tag v$TAG != workspace version $VER"
+            exit 1
+          fi
+          if ! grep -q '^version\.workspace = true$' crates/lib-unknown/Cargo.toml; then
+            echo "::error::Facade version should inherit workspace.package.version"
             exit 1
           fi
 
@@ -33,57 +37,51 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Rust stable + targets
+      - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
         with:
-          components: clippy
-          targets: >-
-            x86_64-unknown-linux-musl,
-            i686-unknown-linux-gnu,
-            aarch64-unknown-linux-gnu,
-            riscv64gc-unknown-linux-gnu,
-            x86_64-linux-android,
-            aarch64-linux-android,
-            i686-linux-android,
-            armv7-linux-androideabi,
-            x86_64-pc-windows-gnu,
-            x86_64-pc-windows-gnullvm,
-            aarch64-pc-windows-msvc,
-            x86_64-unknown-none,
-            wasm32-unknown-unknown,
-            wasm32-wasip1,
-            wasm32-wasip2
+          components: rustfmt, clippy
 
       - name: Install cargo-hack
         uses: taiki-e/install-action@cargo-hack
 
       - uses: Swatinem/rust-cache@v2
 
+      - name: Format
+        run: cargo fmt --all -- --check
+
       - name: Feature combinations check (cargo-hack)
         run: |
-          cargo hack clippy --each-feature --locked -- -D warnings
-          cargo hack test --each-feature --locked
-          cargo hack check --feature-powerset --depth 2 --locked --skip default,rand,rand-default,sys,types,crypto,hash,encoding,dyntest
+          set -euo pipefail
+          for pkg in lib-unknown-polymorphism lib-unknown-seed lib-unknown-lazy \
+                     lib-unknown-errors lib-unknown-hide \
+                     lib-unknown-crypto lib-unknown-rand lib-unknown-types \
+                     lib-unknown-sys lib-unknown-hash lib-unknown-encoding \
+                     lib-unknown-dyntest lib-unknown; do
+            cargo hack -p "$pkg" clippy --each-feature --locked -- -D warnings
+          done
+          cargo hack -p lib-unknown check --feature-powerset --depth 2 --locked \
+            --skip default,rand,rand-default,sys,types,crypto,hash,encoding,dyntest
 
-      - name: Test (no_std default & all-features)
+      - name: Test (workspace all-features & facade default)
         run: |
-          cargo test --locked
-          cargo test --all-features --locked
+          cargo test --workspace --all-features --locked
+          cargo test -p lib-unknown --locked
 
       - name: Doc build (deny warnings)
-        run: cargo doc --no-deps --all-features --locked
+        run: cargo doc --workspace --no-deps --all-features --locked
         env:
           RUSTDOCFLAGS: -D warnings
 
-      - name: Cross-check targets
+      - name: Package check
         run: |
           set -euo pipefail
-          for target in x86_64-unknown-linux-musl i686-unknown-linux-gnu aarch64-unknown-linux-gnu riscv64gc-unknown-linux-gnu x86_64-linux-android aarch64-linux-android i686-linux-android x86_64-pc-windows-gnu x86_64-pc-windows-gnullvm aarch64-pc-windows-msvc; do
-            cargo check --locked --target "$target" --all-features
-          done
-          cargo check --locked --target x86_64-unknown-none --no-default-features --features alloc,rand,types,crypto,hash,lazy,encoding
-          for target in armv7-linux-androideabi wasm32-unknown-unknown wasm32-wasip1 wasm32-wasip2; do
-            cargo check --locked --target "$target" --no-default-features --features rand,types,crypto,hash,lazy,encoding
+          for pkg in lib-unknown-polymorphism lib-unknown-seed lib-unknown-lazy \
+                     lib-unknown-errors lib-unknown-hide \
+                     lib-unknown-crypto lib-unknown-rand lib-unknown-types \
+                     lib-unknown-sys lib-unknown-hash lib-unknown-encoding \
+                     lib-unknown-dyntest lib-unknown; do
+            cargo package -p "$pkg" --locked --no-verify --list >/dev/null
           done
 
   publish-crates:
@@ -100,8 +98,47 @@ jobs:
       - uses: rust-lang/crates-io-auth-action@v1
         id: auth
 
-      - name: Publish to crates.io
-        run: cargo publish --locked --all-features
+      - name: Publish workspace crates in dependency order
+        run: |
+          set -euo pipefail
+          VER="${GITHUB_REF_NAME#v}"
+          CRATES=(
+            lib-unknown-polymorphism
+            lib-unknown-seed
+            lib-unknown-lazy
+            lib-unknown-errors
+            lib-unknown-hide
+            lib-unknown-crypto
+            lib-unknown-rand
+            lib-unknown-types
+            lib-unknown-sys
+            lib-unknown-hash
+            lib-unknown-encoding
+            lib-unknown-dyntest
+            lib-unknown
+          )
+          for pkg in "${CRATES[@]}"; do
+            echo "::group::publish $pkg $VER"
+            if cargo info "${pkg}@${VER}" >/dev/null 2>&1; then
+              echo "$pkg $VER already published, skipping"
+            else
+              ok=0
+              for attempt in 1 2 3 4 5; do
+                if cargo publish -p "$pkg" --locked; then
+                  ok=1
+                  break
+                fi
+                echo "publish $pkg failed (attempt $attempt); waiting for registry propagation"
+                sleep 30
+              done
+              if [ "$ok" != "1" ]; then
+                echo "::error::Failed to publish $pkg $VER"
+                exit 1
+              fi
+            fi
+            echo "::endgroup::"
+            sleep 15
+          done
         env:
           CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
 

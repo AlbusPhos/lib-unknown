@@ -1,0 +1,25 @@
+[package]
+name = "lib-unknown-seed"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+description = "Runtime entropy sources for lib-unknown."
+keywords = ["no-std", "entropy", "seed", "random"]
+categories = ["no-std"]
+
+[dependencies]
+
+# 熵源实现直接依赖各 WASM 平台的时钟接口；非 wasm 目标不会拉取这些依赖。
+[target.'cfg(all(target_arch = "wasm32", not(target_os = "wasi")))'.dependencies]
+wasm-bindgen = { workspace = true, default-features = false }
+
+[target.'cfg(all(target_arch = "wasm32", target_os = "wasi"))'.dependencies]
+wasi = { workspace = true }
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]

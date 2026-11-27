@@ -1,0 +1,23 @@
+[package]
+name = "lib-unknown-lazy"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+description = "no_std OnceLock / LazyLock primitives for lib-unknown."
+keywords = ["no-std", "lazy", "oncelock", "concurrency"]
+categories = ["no-std"]
+
+[dependencies]
+lib-unknown-polymorphism = { workspace = true }
+
+[features]
+default = []
+reproducible = ["lib-unknown-polymorphism/reproducible"]
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]

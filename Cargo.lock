@@ -4,18 +4,107 @@ version = 4
 
 [[package]]
 name = "bumpalo"
-version = "3.20.3"
+version = "3.20.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "72f5acc6cb2ba439de613abc23857ec3d78374d8ed5ac84e9d11336e87da8649"
+checksum = "87a0cf66fd1eb2fb7b822cb78370d82303750809bc6ba855f3f58e517d3238db"
 
 [[package]]
 name = "cfg-if"
-version = "1.0.4"
+version = "1.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9330f8b2ff13f34540b44e946ef35111825727b38d33286ef986142615121801"
+checksum = "4e7648175b45a9a48536d676f68d918270699102aa8dab5496df06904c914600"
 
 [[package]]
 name = "lib-unknown"
+version = "0.5.0"
+dependencies = [
+ "lib-unknown-crypto",
+ "lib-unknown-dyntest",
+ "lib-unknown-encoding",
+ "lib-unknown-errors",
+ "lib-unknown-hash",
+ "lib-unknown-hide",
+ "lib-unknown-lazy",
+ "lib-unknown-rand",
+ "lib-unknown-sys",
+ "lib-unknown-types",
+]
+
+[[package]]
+name = "lib-unknown-crypto"
+version = "0.5.0"
+dependencies = [
+ "lib-unknown-errors",
+ "lib-unknown-hide",
+ "lib-unknown-polymorphism",
+ "lib-unknown-rand",
+]
+
+[[package]]
+name = "lib-unknown-dyntest"
+version = "0.5.0"
+dependencies = [
+ "lib-unknown-errors",
+]
+
+[[package]]
+name = "lib-unknown-encoding"
+version = "0.5.0"
+dependencies = [
+ "lib-unknown-crypto",
+ "lib-unknown-polymorphism",
+]
+
+[[package]]
+name = "lib-unknown-errors"
+version = "0.5.0"
+
+[[package]]
+name = "lib-unknown-hash"
+version = "0.5.0"
+dependencies = [
+ "lib-unknown-hide",
+ "lib-unknown-polymorphism",
+ "lib-unknown-seed",
+]
+
+[[package]]
+name = "lib-unknown-hide"
+version = "0.5.0"
+dependencies = [
+ "lib-unknown-lazy",
+ "lib-unknown-polymorphism",
+]
+
+[[package]]
+name = "lib-unknown-lazy"
+version = "0.5.0"
+dependencies = [
+ "lib-unknown-polymorphism",
+]
+
+[[package]]
+name = "lib-unknown-polymorphism"
+version = "0.5.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
+name = "lib-unknown-rand"
+version = "0.5.0"
+dependencies = [
+ "lib-unknown-crypto",
+ "lib-unknown-hide",
+ "lib-unknown-lazy",
+ "lib-unknown-polymorphism",
+ "lib-unknown-seed",
+]
+
+[[package]]
+name = "lib-unknown-seed"
 version = "0.5.0"
 dependencies = [
  "wasi",
@@ -23,10 +112,20 @@ dependencies = [
 ]
 
 [[package]]
-name = "once_cell"
-version = "1.21.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9f7c3e4beb33f85d45ae3e3a1792185706c8e16d043238c593331cc7cd313b50"
+name = "lib-unknown-sys"
+version = "0.5.0"
+dependencies = [
+ "lib-unknown-errors",
+ "lib-unknown-polymorphism",
+]
+
+[[package]]
+name = "lib-unknown-types"
+version = "0.5.0"
+dependencies = [
+ "lib-unknown-errors",
+ "lib-unknown-polymorphism",
+]
 
 [[package]]
 name = "proc-macro2"
@@ -54,9 +153,9 @@ checksum = "cf54715a573b99ac80df0bc206da022bcd442c974952c7b9720069370852e21f"
 
 [[package]]
 name = "syn"
-version = "3.0.5"
+version = "3.0.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "12df2e0110f65b775f769bb17ef989067a1d931b2eb822bd4346631eeada89f9"
+checksum = "4ae9ccbea3a7b0b09443036490c8f34a8b1b760fd345e5c0dae0aac718faea79"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -65,9 +164,9 @@ dependencies = [
 
 [[package]]
 name = "unicode-ident"
-version = "1.0.24"
+version = "1.0.27"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e6e4313cd5fcd3dad5cafa179702e2b244f760991f45397d14d4ebf38247da75"
+checksum = "a2c754d6c33795a1c324727428e5a7dedb5b06195f9890bdbcba760d3e246563"
 
 [[package]]
 name = "wasi"
@@ -89,12 +188,11 @@ dependencies = [
 
 [[package]]
 name = "wasm-bindgen"
-version = "0.2.128"
+version = "0.2.130"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "aecb87a33d3b0c5e3b7aa46336eaf486cffafbd281b195e4c8b80d50df2351bf"
+checksum = "a0181c14ddd6c7b8b0b0132a5f1ea2f32be0d893cd3ea97b6e3b28886b8a3d1c"
 dependencies = [
  "cfg-if",
- "once_cell",
  "rustversion",
  "wasm-bindgen-macro",
  "wasm-bindgen-shared",
@@ -102,9 +200,9 @@ dependencies = [
 
 [[package]]
 name = "wasm-bindgen-macro"
-version = "0.2.128"
+version = "0.2.130"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a690d511e3c1a8b3a55e33511e3c2c00c78415cd23650f32b808627f5696b9ed"
+checksum = "6e931a02a39abdbf66966fc35902b5ed58344750a70885bed4ebb3d8eaf28ed9"
 dependencies = [
  "quote",
  "wasm-bindgen-macro-support",
@@ -112,9 +210,9 @@ dependencies = [
 
 [[package]]
 name = "wasm-bindgen-macro-support"
-version = "0.2.128"
+version = "0.2.130"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "411e4887f0071ef2d2164a9d5fdf2d20efbef78fccd3a78b0c10a1dc5295e48a"
+checksum = "2ca4b54280e455bd831e33a6b8e734baf432fe63fbc35c42ac14ce67a043a53a"
 dependencies = [
  "bumpalo",
  "proc-macro2",
@@ -125,9 +223,9 @@ dependencies = [
 
 [[package]]
 name = "wasm-bindgen-shared"
-version = "0.2.128"
+version = "0.2.130"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "81941cd78d0c92026c33e5e01312845a4cb1e9af3407f9134b100dd03144103e"
+checksum = "3b1f9c3798725016c6ee5f2f57869ec0831e8bbc0ab0310a86e787e97f41389e"
 dependencies = [
  "unicode-ident",
 ]

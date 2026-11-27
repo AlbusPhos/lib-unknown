@@ -1,0 +1,38 @@
+[package]
+name = "lib-unknown-encoding"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+description = "hex, base64 and hb2 encodings for lib-unknown."
+keywords = ["no-std", "encoding", "base64", "hex"]
+categories = ["no-std", "encoding"]
+
+[dependencies]
+lib-unknown-polymorphism = { workspace = true, optional = true }
+lib-unknown-crypto = { workspace = true, optional = true }
+
+[features]
+default = []
+alloc = []
+reproducible = ["lib-unknown-polymorphism?/reproducible"]
+
+encoding-hex = ["dep:lib-unknown-polymorphism"]
+encoding-hb2 = [
+    "dep:lib-unknown-crypto",
+    "dep:lib-unknown-polymorphism",
+    "lib-unknown-crypto/crypto-core",
+]
+encoding-base64 = ["dep:lib-unknown-polymorphism"]
+encoding = [
+    "encoding-hb2",
+    "encoding-hex",
+    "encoding-base64",
+]
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]

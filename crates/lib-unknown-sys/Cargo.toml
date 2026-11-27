@@ -1,0 +1,33 @@
+[package]
+name = "lib-unknown-sys"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+description = "Raw syscalls and dynamic symbol resolution for lib-unknown."
+keywords = ["no-std", "syscall", "unix", "windows"]
+categories = ["no-std", "os"]
+
+[dependencies]
+lib-unknown-polymorphism = { workspace = true, optional = true }
+lib-unknown-errors = { workspace = true, optional = true }
+
+[features]
+default = []
+reproducible = ["lib-unknown-polymorphism?/reproducible"]
+
+sys-syscall = ["dep:lib-unknown-polymorphism"]
+sys-win = ["dep:lib-unknown-polymorphism"]
+sys-unix = ["dep:lib-unknown-errors", "dep:lib-unknown-polymorphism"]
+sys = [
+    "sys-win",
+    "sys-unix",
+    "sys-syscall",
+]
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]

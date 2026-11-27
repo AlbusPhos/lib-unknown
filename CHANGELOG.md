@@ -11,6 +11,46 @@
 
 ---
 
+## [Unreleased]
+
+### Changed
+- 仓库改为 Cargo Workspace，按职责拆分出 `lib-unknown-polymorphism`、`lib-unknown-seed`、
+  `lib-unknown-lazy`、`lib-unknown-errors`、`lib-unknown-hide`、
+  `lib-unknown-crypto`、`lib-unknown-rand`、`lib-unknown-types`、`lib-unknown-sys`、
+  `lib-unknown-hash`、`lib-unknown-encoding` 与 `lib-unknown-dyntest`；`lib-unknown`
+  作为门面保持原有公开模块路径与 Feature 名称。
+- 原 `lib-unknown-core` 拆分为 `lib-unknown-errors` 与 `lib-unknown-hide`；`cfg_if!` /
+  `cfg_match!` 并入门面 `src/utils/cfg.rs`，保留 `lib_unknown::utils` 模块路径及根宏路径，
+  不再发布独立的 `lib-unknown-cfg` crate。`hide` 依赖 `lib-unknown-polymorphism`
+  与可选的 `lib-unknown-lazy`。
+- 新增 `lib-unknown-polymorphism` 过程宏 crate（仅依赖 `syn` / `quote` / `proc-macro2`），
+  提供 `poly` / `poly_attr!` / `poly_branch!` / `poly_select!` / `const_random!`；内部使用
+  自实现 Xoshiro256++，支持 `POLY_SEED` 与 `reproducible` feature。随机流按
+  `(kind, crate, normalized_context)` 哈希分片计数，并归一化空白与 CRLF 转义，
+  局部代码或 `#[cfg]` 变化不会影响无关调用点；各多态 crate 通过 `poly_track_env!`
+  植入 `POLY_SEED` 环境依赖，种子变化可触发 Cargo 正确重编译。
+- **[BREAKING]** 移除全部 crate 的 `build.rs` 以及 `coin0..coin127` / `dice0..dice9`
+  cfg 体系；原手写 `cfg_attr` 多态逻辑统一改为 `poly_attr!`，结构化分支改为
+  `poly_branch!` / `poly_select!`。`const_random!` 从 `lib-unknown-hide` 迁入
+  `lib-unknown-polymorphism`，并由 hide / 门面重导出。
+- 仅控制内联 / `#[cold]` 的 356 处 `poly_attr` 进一步收敛为 `#[poly(...)]`：
+  热路径小函数使用高内联概率且 `cold = 0`，函数体越大内联概率越低；初始化、生成与
+  动态解析路径使用较低内联概率和 `0.05..0.15` 冷路径概率。含中性 `inline` 或空属性臂、
+  无法用 `#[poly]` 等价表达的组合保留为 `poly_attr`。
+- `lib-unknown-seed` 收敛为纯运行时熵源，移除构建脚本、`__private` 常量与 `build` feature。
+- `OnceLock` / `LazyLock` 独立为 `lib-unknown-lazy`。
+- `lib-unknown-hash` 的 `seed` 直接依赖 `lib-unknown-seed`，不再拉入
+  `lib-unknown-rand` / `lib-unknown-crypto`；`lib-unknown-dyntest` 精简为仅依赖
+  `lib-unknown-errors`；`lib-unknown-encoding` 的 `hb2` 依赖 `lib-unknown-crypto`
+  的 `crypto-core`，hex / base64 保持独立。
+- `lib-unknown-seed` 移除构建脚本与 feature 门控，`probe` / `seed` / `seed128`
+  始终可用；`lib-unknown-rand` 的 `rand-seed` 仅控制是否重导出运行时熵源。
+- crypto / rand / hash / sys / encoding 的宏与内部依赖改为按 feature 可选，未启用
+  功能时不再产生 unused dependency 警告，也避免无 feature 构建拉入空依赖。
+
+
+---
+
 ## [0.5.0] - 2026-11-17
 
 ### Added
@@ -255,8 +295,8 @@
   均提供 `const fn` 定容缓冲接口及 `alloc` 下的 `Vec` 封装。
 - `errors`：统一 `Error` / `ErrType` / `Result` / `ErrorMessage`，
   以及 `err!` / `bail!` / `ensure!` 宏。
-- `dyntest`：开发期动态编译运行 harness，包含 `DnyRun`、`DnyTask`、`BatchRunner`、
-  `DnyResult`，支持超时、批量执行与缓存；需要同时启用 `std`。
+- `dyntest`：开发期动态编译运行 harness，包含 `Runner`、`Task`、`BatchRunner`、
+  `RunnerResult`，支持超时、批量执行与缓存；需要同时启用 `std`。
 - 平台与目标支持：完整测试覆盖 `x86_64-unknown-linux-gnu`；多个 Linux / Android /
   Windows 目标通过 `cargo check --all-features`；WASM 目标在非 `sys` 模块下可按需使用
   `wasm-bindgen` 或 WASI preview1 绑定。

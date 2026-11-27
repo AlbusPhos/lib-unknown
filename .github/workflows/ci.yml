@@ -35,28 +35,31 @@ jobs:
       - name: rustfmt
         run: cargo fmt --all -- --check
 
-      # 1. 验证纯 no_std (默认特性，无 alloc/std) 的 Clippy 与测试
-      - name: clippy (no_std default)
-        run: cargo clippy --all-targets --locked -- -D warnings
+      - name: clippy (workspace default)
+        run: cargo clippy --workspace --all-targets --locked -- -D warnings
 
-      - name: check (no-default-features)
-        run: cargo check --no-default-features --locked
+      - name: check (workspace, no default features)
+        run: cargo check --workspace --no-default-features --locked
 
-      - name: check (no_std + alloc)
-        run: cargo check --no-default-features --features alloc,rand,sys,types,crypto,hash,lazy,encoding --locked
+      - name: check (facade no_std + alloc feature set)
+        run: >-
+          cargo check -p lib-unknown --no-default-features --locked
+          --features alloc,rand,sys,types,crypto,hash,lazy,encoding
 
-      # 2. 验证全特性 (含 std, alloc, dyntest) 的 Clippy 与测试
-      - name: clippy (all-features)
-        run: cargo clippy --all-targets --all-features --locked -- -D warnings
+      - name: clippy (workspace all-features)
+        run: cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
 
-      - name: test (no_std default)
-        run: cargo test --locked
+      - name: test (workspace all-features, includes doctests)
+        run: cargo test --workspace --all-features --locked
 
-      - name: test (all-features, includes doctests)
-        run: cargo test --all-features --locked
+      - name: test (facade default features)
+        run: cargo test -p lib-unknown --locked
 
-      - name: doc build (deny warnings)
-        run: cargo doc --no-deps --all-features --locked
+      - name: test (facade, no default features)
+        run: cargo test -p lib-unknown --no-default-features --locked
+
+      - name: doc (workspace, deny warnings)
+        run: cargo doc --workspace --no-deps --all-features --locked
         env:
           RUSTDOCFLAGS: -D warnings
 
@@ -80,20 +83,45 @@ jobs:
           key: cargo-hack
 
       - name: Clippy each feature individually
-        run: cargo hack clippy --each-feature --locked -- -D warnings
+        run: |
+          set -euo pipefail
+          for pkg in lib-unknown-polymorphism lib-unknown-seed lib-unknown-lazy \
+                     lib-unknown-errors lib-unknown-hide \
+                     lib-unknown-crypto lib-unknown-rand lib-unknown-types \
+                     lib-unknown-sys lib-unknown-hash lib-unknown-encoding \
+                     lib-unknown-dyntest lib-unknown; do
+            echo "::group::clippy $pkg"
+            cargo hack -p "$pkg" clippy --each-feature --locked -- -D warnings
+            echo "::endgroup::"
+          done
 
       - name: Test each feature individually
-        run: cargo hack test --each-feature --locked
+        run: |
+          set -euo pipefail
+          for pkg in lib-unknown-polymorphism lib-unknown-errors \
+                     lib-unknown-hide \
+                     lib-unknown-rand lib-unknown-types \
+                     lib-unknown-sys lib-unknown-hash lib-unknown-encoding \
+                     lib-unknown-crypto lib-unknown; do
+            echo "::group::test $pkg"
+            cargo hack -p "$pkg" test --each-feature --locked
+            echo "::endgroup::"
+          done
 
-      - name: Check feature powerset (depth 2)
+      - name: Check facade feature powerset (depth 2)
         run: >-
-          cargo hack check --feature-powerset --depth 2 --locked
+          cargo hack -p lib-unknown check --feature-powerset --depth 2 --locked
           --skip default,rand,rand-default,sys,types,crypto,hash,encoding,dyntest
 
-      - name: Check each feature on WASM targets
+      - name: Check WASM targets
         run: |
-          cargo hack check --each-feature --locked --target wasm32-unknown-unknown --exclude-features default,sys,sys-syscall,sys-win,sys-unix
-          cargo hack check --each-feature --locked --target wasm32-wasip1 --exclude-features default,sys,sys-syscall,sys-win,sys-unix
+          set -euo pipefail
+          cargo hack -p lib-unknown check --each-feature --locked \
+            --target wasm32-unknown-unknown \
+            --exclude-features default,sys,sys-syscall,sys-win,sys-unix
+          cargo hack -p lib-unknown check --each-feature --locked \
+            --target wasm32-wasip1 \
+            --exclude-features default,sys,sys-syscall,sys-win,sys-unix
 
   platform:
     name: ${{ matrix.name }}
@@ -127,14 +155,14 @@ jobs:
         with:
           key: ${{ matrix.target }}
 
-      - name: test (no_std default)
-        run: cargo test --locked --target ${{ matrix.target }}
+      - name: test (facade default)
+        run: cargo test -p lib-unknown --locked --target ${{ matrix.target }}
 
-      - name: test (all-features, includes doctests)
-        run: cargo test --all-features --locked --target ${{ matrix.target }}
+      - name: test (facade all-features, includes doctests)
+        run: cargo test -p lib-unknown --all-features --locked --target ${{ matrix.target }}
 
-      - name: doc build (deny warnings)
-        run: cargo doc --no-deps --all-features --locked --target ${{ matrix.target }}
+      - name: doc (facade, deny warnings)
+        run: cargo doc -p lib-unknown --no-deps --all-features --locked --target ${{ matrix.target }}
         env:
           RUSTDOCFLAGS: -D warnings
 
@@ -168,7 +196,7 @@ jobs:
         with:
           key: cross-check-all
 
-      - name: Check full-support targets (no_std & all-features)
+      - name: Check full-support targets (facade, no_std & all-features)
         run: |
           set -euo pipefail
           TARGETS=(
@@ -185,14 +213,15 @@ jobs:
           )
           for target in "${TARGETS[@]}"; do
             echo "::group::Checking $target"
-            cargo check --locked --target "$target"
-            cargo check --locked --target "$target" --all-features
+            cargo check -p lib-unknown --locked --target "$target"
+            cargo check -p lib-unknown --locked --target "$target" --all-features
             echo "::endgroup::"
           done
 
       - name: Check bare-metal target (no_std only)
-        run: |
-          cargo check --locked --target x86_64-unknown-none --no-default-features --features alloc,rand,types,crypto,hash,lazy,encoding
+        run: >-
+          cargo check -p lib-unknown --locked --target x86_64-unknown-none
+          --no-default-features --features alloc,rand,types,crypto,hash,lazy,encoding
 
       - name: Check non-sys targets (ARMv7 & WASM)
         run: |
@@ -200,6 +229,6 @@ jobs:
           NON_SYS_FEATURES="rand,types,crypto,hash,lazy,encoding"
           for target in armv7-linux-androideabi wasm32-unknown-unknown wasm32-wasip1 wasm32-wasip2; do
             echo "::group::Checking $target"
-            cargo check --locked --target "$target" --no-default-features --features "$NON_SYS_FEATURES"
+            cargo check -p lib-unknown --locked --target "$target" --no-default-features --features "$NON_SYS_FEATURES"
             echo "::endgroup::"
           done

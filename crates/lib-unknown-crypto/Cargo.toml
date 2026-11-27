@@ -1,0 +1,45 @@
+[package]
+name = "lib-unknown-crypto"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+description = "ChaCha20, MSE obfuscation ciphers and cryptographic primitives for lib-unknown."
+keywords = ["no-std", "crypto", "chacha20", "obfuscation"]
+categories = ["no-std", "cryptography"]
+
+[dependencies]
+lib-unknown-polymorphism = { workspace = true, optional = true }
+lib-unknown-errors = { workspace = true, optional = true }
+lib-unknown-hide = { workspace = true, optional = true }
+
+[dev-dependencies]
+# 只写 path：发布时该 dev-dependency 会被剥离，避免 crypto <-> rand 的发布顺序死锁。
+lib-unknown-rand = { path = "../lib-unknown-rand", default-features = false, features = ["rand-seed", "rand-core", "rand-cwg", "std"] }
+
+[features]
+default = []
+reproducible = ["lib-unknown-polymorphism?/reproducible"]
+
+crypto-core = [
+    "dep:lib-unknown-polymorphism",
+    "dep:lib-unknown-errors",
+    "dep:lib-unknown-hide",
+    "lib-unknown-hide/lazy",
+]
+crypto-mse = ["crypto-core"]
+crypto-mse2 = ["crypto-core"]
+crypto-chacha20 = ["crypto-core"]
+crypto = [
+    "crypto-core",
+    "crypto-mse",
+    "crypto-mse2",
+    "crypto-chacha20",
+]
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]

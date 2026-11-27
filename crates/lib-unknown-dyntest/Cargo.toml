@@ -1,0 +1,18 @@
+[package]
+name = "lib-unknown-dyntest"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+description = "Dynamic compile-and-run harness for lib-unknown development."
+keywords = ["testing", "harness", "cargo"]
+categories = ["development-tools::testing"]
+
+[dependencies]
+lib-unknown-errors = { workspace = true }
+
+[package.metadata.docs.rs]
+all-features = true

@@ -1,0 +1,163 @@
+[package]
+name = "lib-unknown"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+documentation = "https://docs.rs/lib-unknown"
+readme = "README.md"
+description = "A no_std library with compile-time randomized system calls, random number generation, cryptography, and encoding."
+keywords = ["no-std", "syscall", "crypto", "rand", "obfuscation"]
+categories = ["no-std", "cryptography", "os"]
+
+[dependencies]
+lib-unknown-errors = { workspace = true }
+lib-unknown-hide = { workspace = true }
+lib-unknown-lazy = { workspace = true, optional = true }
+lib-unknown-rand = { workspace = true, optional = true }
+lib-unknown-sys = { workspace = true, optional = true }
+lib-unknown-types = { workspace = true, optional = true }
+lib-unknown-crypto = { workspace = true, optional = true }
+lib-unknown-hash = { workspace = true, optional = true }
+lib-unknown-encoding = { workspace = true, optional = true }
+lib-unknown-dyntest = { workspace = true, optional = true }
+
+[dev-dependencies]
+lib-unknown-dyntest = { workspace = true }
+
+[features]
+default = [
+    "rand",
+    "sys",
+    "types",
+    "crypto",
+    "hash",
+    "lazy",
+    "encoding",
+]
+reproducible = [
+    "lib-unknown-hide/reproducible",
+    "lib-unknown-lazy?/reproducible",
+    "lib-unknown-crypto?/reproducible",
+    "lib-unknown-rand?/reproducible",
+    "lib-unknown-types?/reproducible",
+    "lib-unknown-sys?/reproducible",
+    "lib-unknown-hash?/reproducible",
+    "lib-unknown-encoding?/reproducible",
+]
+std = [
+    "alloc",
+    "lib-unknown-rand?/std",
+]
+alloc = [
+    "lib-unknown-errors/alloc",
+    "lib-unknown-rand?/alloc",
+    "lib-unknown-types?/alloc",
+    "lib-unknown-encoding?/alloc",
+]
+
+lazy = ["dep:lib-unknown-lazy", "lib-unknown-hide/lazy"]
+
+rand-seed = [
+    "dep:lib-unknown-rand",
+    "lib-unknown-rand/rand-seed",
+    "lib-unknown-hash?/seed",
+]
+rand-core = [
+    "dep:lib-unknown-rand",
+    "lib-unknown-rand/rand-core",
+    "crypto-core",
+]
+rand-splitmix64 = [
+    "dep:lib-unknown-rand",
+    "lib-unknown-rand/rand-splitmix64",
+    "crypto-core",
+]
+rand-cwg = [
+    "dep:lib-unknown-rand",
+    "lib-unknown-rand/rand-cwg",
+    "crypto-core",
+]
+rand-chacha = [
+    "dep:lib-unknown-rand",
+    "lib-unknown-rand/rand-chacha",
+    "crypto-core",
+]
+rand-xoshiro = [
+    "dep:lib-unknown-rand",
+    "lib-unknown-rand/rand-xoshiro",
+    "crypto-core",
+]
+rand-default = [
+    "rand-seed",
+    "rand-core",
+    "rand-cwg",
+]
+
+rand = [
+    "rand-default",
+    "rand-chacha",
+    "rand-xoshiro",
+    "rand-cwg",
+]
+
+sys-syscall = ["dep:lib-unknown-sys", "lib-unknown-sys/sys-syscall"]
+sys-win = ["dep:lib-unknown-sys", "lib-unknown-sys/sys-win"]
+sys-unix = ["dep:lib-unknown-sys", "lib-unknown-sys/sys-unix"]
+sys = [
+    "sys-win",
+    "sys-unix",
+    "sys-syscall",
+]
+
+types-buffer = ["dep:lib-unknown-types", "lib-unknown-types/types-buffer"]
+types-str = ["types-buffer", "lib-unknown-types/types-str"]
+types-cstr = ["types-buffer", "lib-unknown-types/types-cstr"]
+types = [
+    "types-str",
+    "types-buffer",
+    "types-cstr",
+]
+
+crypto-core = ["lazy", "dep:lib-unknown-crypto", "lib-unknown-crypto/crypto-core"]
+crypto-mse = ["crypto-core", "lib-unknown-crypto/crypto-mse"]
+crypto-mse2 = ["crypto-core", "lib-unknown-crypto/crypto-mse2"]
+crypto-chacha20 = ["crypto-core", "lib-unknown-crypto/crypto-chacha20"]
+crypto = [
+    "crypto-core",
+    "crypto-mse",
+    "crypto-chacha20",
+    "crypto-mse2",
+]
+
+hash-core = ["lazy", "dep:lib-unknown-hash", "lib-unknown-hash/hash-core"]
+hash-hashmap = ["hash-core", "lib-unknown-hash/hash-hashmap"]
+hash = [
+    "hash-core",
+    "hash-hashmap",
+]
+
+encoding-hex = ["dep:lib-unknown-encoding", "lib-unknown-encoding/encoding-hex"]
+encoding-hb2 = [
+    "dep:lib-unknown-encoding",
+    "lib-unknown-encoding/encoding-hb2",
+    "crypto-core",
+]
+encoding-base64 = ["dep:lib-unknown-encoding", "lib-unknown-encoding/encoding-base64"]
+encoding = [
+    "encoding-hb2",
+    "encoding-hex",
+    "encoding-base64",
+]
+
+dyntest = [
+    "dep:lib-unknown-dyntest",
+    "std",
+]
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]

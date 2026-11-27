@@ -1,0 +1,37 @@
+[package]
+name = "lib-unknown-hash"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+description = "Lightweight multi-lane hash and fixed-capacity hash map for lib-unknown."
+keywords = ["no-std", "hash", "hashmap"]
+categories = ["no-std", "data-structures"]
+
+[dependencies]
+lib-unknown-polymorphism = { workspace = true, optional = true }
+lib-unknown-hide = { workspace = true, optional = true }
+lib-unknown-seed = { workspace = true, optional = true }
+
+[features]
+default = []
+reproducible = ["lib-unknown-polymorphism?/reproducible"]
+
+hash-core = [
+    "dep:lib-unknown-hide",
+    "dep:lib-unknown-polymorphism",
+    "lib-unknown-hide/lazy",
+]
+hash-hashmap = ["hash-core"]
+hash = [
+    "hash-core",
+    "hash-hashmap",
+]
+seed = ["hash-hashmap", "dep:lib-unknown-seed"]
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]

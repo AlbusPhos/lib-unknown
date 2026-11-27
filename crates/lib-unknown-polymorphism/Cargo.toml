@@ -1,0 +1,28 @@
+[package]
+name = "lib-unknown-polymorphism"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+description = "Compile-time polymorphism and reproducible randomness proc-macros for lib-unknown."
+keywords = ["proc-macro", "polymorphism", "obfuscation", "reproducible"]
+categories = ["development-tools::procedural-macro-helpers"]
+
+[lib]
+proc-macro = true
+
+[dependencies]
+proc-macro2 = "1"
+quote = "1"
+syn = { version = "3", features = ["full"] }
+
+[features]
+default = []
+reproducible = []
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]

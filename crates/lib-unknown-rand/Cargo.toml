@@ -1,0 +1,75 @@
+[package]
+name = "lib-unknown-rand"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+description = "no_std entropy sources and PRNG families for lib-unknown."
+keywords = ["no-std", "rand", "prng", "entropy"]
+categories = ["no-std"]
+
+[dependencies]
+lib-unknown-polymorphism = { workspace = true, optional = true }
+lib-unknown-hide = { workspace = true, optional = true }
+lib-unknown-lazy = { workspace = true, optional = true }
+lib-unknown-crypto = { workspace = true, optional = true }
+lib-unknown-seed = { workspace = true, optional = true }
+
+[dev-dependencies]
+lib-unknown-seed = { workspace = true }
+
+[features]
+default = []
+std = ["alloc"]
+alloc = []
+reproducible = ["lib-unknown-polymorphism?/reproducible"]
+
+rand-seed = ["dep:lib-unknown-seed"]
+rand-core = [
+    "rand-splitmix64",
+    "dep:lib-unknown-crypto",
+    "dep:lib-unknown-hide",
+    "dep:lib-unknown-lazy",
+    "dep:lib-unknown-polymorphism",
+    "lib-unknown-crypto/crypto-core",
+]
+rand-splitmix64 = [
+    "dep:lib-unknown-crypto",
+    "dep:lib-unknown-polymorphism",
+    "lib-unknown-crypto/crypto-core",
+]
+rand-cwg = [
+    "dep:lib-unknown-crypto",
+    "dep:lib-unknown-polymorphism",
+    "lib-unknown-crypto/crypto-core",
+]
+rand-chacha = [
+    "dep:lib-unknown-crypto",
+    "dep:lib-unknown-hide",
+    "dep:lib-unknown-polymorphism",
+    "lib-unknown-crypto/crypto-core",
+]
+rand-xoshiro = [
+    "dep:lib-unknown-crypto",
+    "dep:lib-unknown-polymorphism",
+    "lib-unknown-crypto/crypto-core",
+]
+rand-default = [
+    "rand-seed",
+    "rand-core",
+    "rand-cwg",
+]
+
+rand = [
+    "rand-default",
+    "rand-chacha",
+    "rand-xoshiro",
+    "rand-cwg",
+]
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
