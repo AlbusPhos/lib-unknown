@@ -1,5 +1,5 @@
 [package]
-name = "lib-unknown-dyntest"
+name = "lib-unknown-harness"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

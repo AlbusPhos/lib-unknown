@@ -30,7 +30,7 @@ fn base_dyn_tests_dir() -> PathBuf {
 /// # Examples
 ///
 /// ```rust,no_run
-/// use lib_unknown_dyntest::{BatchRunner, Task};
+/// use lib_unknown_harness::{BatchRunner, Task};
 ///
 /// let task = Task::new("hello", r#"fn main() { println!("hi"); }"#);
 /// let results = BatchRunner::new().run([task]);
@@ -185,7 +185,7 @@ impl fmt::Display for RunnerResult {
 /// # Examples
 ///
 /// ```rust
-/// use lib_unknown_dyntest::Task;
+/// use lib_unknown_harness::Task;
 ///
 /// let task = Task::new("hello", r#"fn main() { println!("hi"); }"#)
 ///     .with_deps(r#"serde = "1""#)
@@ -215,7 +215,7 @@ impl Task {
     /// # Examples
     ///
     /// ```rust
-    /// use lib_unknown_dyntest::Task;
+    /// use lib_unknown_harness::Task;
     ///
     /// let task = Task::new("t", "fn main() {}");
     /// assert_eq!(task.tag, "t");
@@ -287,7 +287,7 @@ impl From<(String, String, Option<String>)> for Task {
 /// # Examples
 ///
 /// ```rust,no_run
-/// use lib_unknown_dyntest::{BatchRunner, Task};
+/// use lib_unknown_harness::{BatchRunner, Task};
 ///
 /// let tasks = [Task::new("a", "fn main() {}"), Task::new("b", "fn main() {}")];
 /// let results = BatchRunner::new().only_build(true).run(tasks);
@@ -357,7 +357,7 @@ impl BatchRunner {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use lib_unknown_dyntest::{BatchRunner, Task};
+    /// use lib_unknown_harness::{BatchRunner, Task};
     ///
     /// let results = BatchRunner::new().run([Task::new("a", "fn main() {}")]);
     /// assert!(results[0].1.ok);
@@ -457,7 +457,7 @@ impl BatchRunner {
 /// # Examples
 ///
 /// ```rust,no_run
-/// use lib_unknown_dyntest::run;
+/// use lib_unknown_harness::run;
 ///
 /// let res = run("fn main() {}", "", None, true);
 /// assert!(res.ok);
@@ -482,7 +482,7 @@ pub fn run(
 /// # Examples
 ///
 /// ```rust,no_run
-/// use lib_unknown_dyntest::{Task, run_batch};
+/// use lib_unknown_harness::{Task, run_batch};
 ///
 /// let results = run_batch([Task::new("a", "fn main() {}")], None, None, None);
 /// assert_eq!(results.len(), 1);
@@ -512,7 +512,7 @@ where
 /// # Examples
 ///
 /// ```rust,no_run
-/// use lib_unknown_dyntest::{Task, run_batch_use_cache};
+/// use lib_unknown_harness::{Task, run_batch_use_cache};
 ///
 /// let results = run_batch_use_cache([Task::new("a", "fn main() {}")], None, None, None);
 /// assert_eq!(results[0].0, "init_cache");
@@ -559,7 +559,7 @@ impl Runner {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use lib_unknown_dyntest::Runner;
+    /// use lib_unknown_harness::Runner;
     ///
     /// let runner = Runner::new("fn main() {}", "");
     /// let res = runner.build(None);
@@ -847,7 +847,7 @@ edition = "2021"
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use lib_unknown_dyntest::Runner;
+    /// use lib_unknown_harness::Runner;
     ///
     /// let res = Runner::new("fn main() {}", "").build(None);
     /// assert!(res.ok);
@@ -873,7 +873,7 @@ edition = "2021"
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use lib_unknown_dyntest::Runner;
+    /// use lib_unknown_harness::Runner;
     ///
     /// let res = Runner::new(r#"fn main() { println!("hi"); }"#, "").run(None);
     /// assert!(res.ok);
@@ -903,7 +903,7 @@ edition = "2021"
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use lib_unknown_dyntest::Runner;
+    /// use lib_unknown_harness::Runner;
     ///
     /// let runner = Runner::new("fn main() {}", "");
     /// let build_res = runner.build(None);
@@ -992,7 +992,7 @@ edition = "2021"
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use lib_unknown_dyntest::Runner;
+    /// use lib_unknown_harness::Runner;
     ///
     /// let runner = Runner::new("fn main() {}", "");
     /// let build_res = runner.build(None);
@@ -1055,7 +1055,7 @@ edition = "2021"
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use lib_unknown_dyntest::Runner;
+    /// use lib_unknown_harness::Runner;
     ///
     /// let runner = Runner::new("fn main() {}", "");
     /// let res = runner.cargo(&["check"], None);
@@ -1170,7 +1170,7 @@ impl Drop for TestLock {
 /// # Examples
 ///
 /// ```rust,no_run
-/// use lib_unknown_dyntest::clear_project;
+/// use lib_unknown_harness::clear_project;
 ///
 /// clear_project(None);
 /// ```

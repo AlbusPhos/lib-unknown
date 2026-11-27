@@ -14,11 +14,13 @@
 ## [Unreleased]
 
 ### Changed
+- **[BREAKING]** `lib-unknown-dyntest` 重命名为 `lib-unknown-harness`；门面模块路径与
+  feature 由 `dyntest` 同步改为 `harness`。
 - 仓库改为 Cargo Workspace，按职责拆分出 `lib-unknown-polymorphism`、`lib-unknown-seed`、
   `lib-unknown-lazy`、`lib-unknown-errors`、`lib-unknown-hide`、
   `lib-unknown-crypto`、`lib-unknown-rand`、`lib-unknown-types`、`lib-unknown-sys`、
-  `lib-unknown-hash`、`lib-unknown-encoding` 与 `lib-unknown-dyntest`；`lib-unknown`
-  作为门面保持原有公开模块路径与 Feature 名称。
+  `lib-unknown-hash`、`lib-unknown-encoding` 与 `lib-unknown-harness`；`lib-unknown`
+  作为门面保持原有公开模块路径与 Feature 名称（`dyntest` 除外，见上）。
 - 原 `lib-unknown-core` 拆分为 `lib-unknown-errors` 与 `lib-unknown-hide`；`cfg_if!` /
   `cfg_match!` 并入门面 `src/utils/cfg.rs`，保留 `lib_unknown::utils` 模块路径及根宏路径，
   不再发布独立的 `lib-unknown-cfg` crate。`hide` 依赖 `lib-unknown-polymorphism`
@@ -40,7 +42,7 @@
 - `lib-unknown-seed` 收敛为纯运行时熵源，移除构建脚本、`__private` 常量与 `build` feature。
 - `OnceLock` / `LazyLock` 独立为 `lib-unknown-lazy`。
 - `lib-unknown-hash` 的 `seed` 直接依赖 `lib-unknown-seed`，不再拉入
-  `lib-unknown-rand` / `lib-unknown-crypto`；`lib-unknown-dyntest` 精简为仅依赖
+  `lib-unknown-rand` / `lib-unknown-crypto`；`lib-unknown-harness` 精简为仅依赖
   `lib-unknown-errors`；`lib-unknown-encoding` 的 `hb2` 依赖 `lib-unknown-crypto`
   的 `crypto-core`，hex / base64 保持独立。
 - `lib-unknown-seed` 移除构建脚本与 feature 门控，`probe` / `seed` / `seed128`

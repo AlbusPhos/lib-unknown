@@ -12,7 +12,7 @@ members = [
     "crates/lib-unknown-sys",
     "crates/lib-unknown-hash",
     "crates/lib-unknown-encoding",
-    "crates/lib-unknown-dyntest",
+    "crates/lib-unknown-harness",
     "crates/lib-unknown",
 ]
 
@@ -37,7 +37,7 @@ lib-unknown-types = { path = "crates/lib-unknown-types", version = "0.6.0-rc1", 
 lib-unknown-sys = { path = "crates/lib-unknown-sys", version = "0.6.0-rc1", default-features = false }
 lib-unknown-hash = { path = "crates/lib-unknown-hash", version = "0.6.0-rc1", default-features = false }
 lib-unknown-encoding = { path = "crates/lib-unknown-encoding", version = "0.6.0-rc1", default-features = false }
-lib-unknown-dyntest = { path = "crates/lib-unknown-dyntest", version = "0.6.0-rc1", default-features = false }
+lib-unknown-harness = { path = "crates/lib-unknown-harness", version = "0.6.0-rc1", default-features = false }
 
 wasm-bindgen = { version = "0.2", default-features = false }
 wasi = { version = "0.14", default-features = false }

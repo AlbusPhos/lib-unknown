@@ -19,9 +19,9 @@ name = "lib-unknown"
 version = "0.6.0-rc1"
 dependencies = [
  "lib-unknown-crypto",
- "lib-unknown-dyntest",
  "lib-unknown-encoding",
  "lib-unknown-errors",
+ "lib-unknown-harness",
  "lib-unknown-hash",
  "lib-unknown-hide",
  "lib-unknown-lazy",
@@ -41,13 +41,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "lib-unknown-dyntest"
-version = "0.6.0-rc1"
-dependencies = [
- "lib-unknown-errors",
-]
-
-[[package]]
 name = "lib-unknown-encoding"
 version = "0.6.0-rc1"
 dependencies = [
@@ -58,6 +51,13 @@ dependencies = [
 [[package]]
 name = "lib-unknown-errors"
 version = "0.6.0-rc1"
+
+[[package]]
+name = "lib-unknown-harness"
+version = "0.6.0-rc1"
+dependencies = [
+ "lib-unknown-errors",
+]
 
 [[package]]
 name = "lib-unknown-hash"

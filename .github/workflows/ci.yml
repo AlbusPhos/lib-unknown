@@ -89,7 +89,7 @@ jobs:
                      lib-unknown-errors lib-unknown-hide \
                      lib-unknown-crypto lib-unknown-rand lib-unknown-types \
                      lib-unknown-sys lib-unknown-hash lib-unknown-encoding \
-                     lib-unknown-dyntest lib-unknown; do
+                     lib-unknown-harness lib-unknown; do
             echo "::group::clippy $pkg"
             cargo hack -p "$pkg" clippy --each-feature --locked -- -D warnings
             echo "::endgroup::"
@@ -111,7 +111,7 @@ jobs:
       - name: Check facade feature powerset (depth 2)
         run: >-
           cargo hack -p lib-unknown check --feature-powerset --depth 2 --locked
-          --skip default,rand,rand-default,sys,types,crypto,hash,encoding,dyntest
+          --skip default,rand,rand-default,sys,types,crypto,hash,encoding,harness
 
       - name: Check WASM targets
         run: |
