@@ -742,14 +742,7 @@ pub unsafe fn syscall3(n: usize, a1: usize, a2: usize, a3: usize) -> isize {
 /// # Feature Requirement
 ///
 /// 需要启用 `"sys-syscall"` 特性。
-#[lib_unknown_polymorphism::poly_attr(
-    weight(2) => [cold, inline(never)],
-    weight(1) => [cold, inline(always)],
-    weight(6) => [inline(never)],
-    weight(3) => [inline(always)],
-    weight(1) => [cold, inline],
-    weight(3) => [inline],
-)]
+#[poly]
 pub unsafe fn syscall4(n: usize, a1: usize, a2: usize, a3: usize, a4: usize) -> isize {
     let ret: isize;
 
@@ -941,14 +934,7 @@ pub unsafe fn syscall4(n: usize, a1: usize, a2: usize, a3: usize, a4: usize) -> 
 /// # Feature Requirement
 ///
 /// 需要启用 `"sys-syscall"` 特性。
-#[lib_unknown_polymorphism::poly_attr(
-    weight(2) => [cold, inline(never)],
-    weight(1) => [cold, inline(always)],
-    weight(1) => [cold, inline],
-    weight(6) => [inline(never)],
-    weight(3) => [inline(always)],
-    weight(3) => [inline],
-)]
+#[poly]
 pub unsafe fn syscall5(n: usize, a1: usize, a2: usize, a3: usize, a4: usize, a5: usize) -> isize {
     let ret: isize;
 

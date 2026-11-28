@@ -119,21 +119,18 @@ fn reverse_endian_chunks(bytes: &mut [u8], chunk_size: usize) {
 }
 
 /// 对切片执行防编译器优化（DSE）的多态清零。
-#[lib_unknown_polymorphism::poly_attr(
-    weight(2) => [inline(always)],
-    weight(2) => [inline(never)],
-    weight(1) => [inline],
-    weight(1) => [cold, inline(never)],
-)]
+#[poly]
 pub fn volatile_zero<T: ZeroablePrimitive>(buf: &mut [T]) -> T {
     let buf = black_box(buf);
     let ptr = buf.as_mut_ptr();
     let len = buf.len();
+    let mut ret: T = T::ZERO;
 
-    lib_unknown_polymorphism::poly_branch! {
+    black_box(lib_unknown_polymorphism::poly_branch! {
         weight(1) => unsafe {
             // SAFETY: `ptr` 与 `len` 来自合法切片，`T` 全零位模式合法。
             core::ptr::write_bytes(black_box(ptr), 0, black_box(len));
+            1
         },
         weight(1) => {
             for i in 0..black_box(len) {
@@ -142,6 +139,7 @@ pub fn volatile_zero<T: ZeroablePrimitive>(buf: &mut [T]) -> T {
                     core::ptr::write_volatile(ptr.add(i), black_box(T::ZERO));
                 }
             }
+            2
         },
         weight(1) => {
             let mut i = black_box(len);
@@ -152,6 +150,7 @@ pub fn volatile_zero<T: ZeroablePrimitive>(buf: &mut [T]) -> T {
                     core::ptr::write_volatile(ptr.add(i), black_box(T::ZERO));
                 }
             }
+            3
         },
         weight(2) => {
             // SAFETY: `T` 与 `usize` 均满足无填充、全零合法、任意位模式合法。
@@ -168,6 +167,7 @@ pub fn volatile_zero<T: ZeroablePrimitive>(buf: &mut [T]) -> T {
                 // SAFETY: 同前缀——`align_to_mut` 保证元素有效，全零为 `T` 合法位模式。
                 unsafe { core::ptr::write_volatile(x, T::ZERO) };
             }
+            4
         },
         weight(1) => unsafe {
             // SAFETY: 契约第 3 条保证任意位模式（如 0xAA / 0x55）对 `T` 均为合法值。
@@ -175,8 +175,9 @@ pub fn volatile_zero<T: ZeroablePrimitive>(buf: &mut [T]) -> T {
             core::ptr::write_bytes(black_box(ptr), mask, black_box(len));
             compiler_fence(Ordering::SeqCst);
             core::ptr::write_bytes(black_box(ptr), 0, black_box(len));
+            5
         },
-    }
+    });
 
     black_box(buf);
 
@@ -184,8 +185,6 @@ pub fn volatile_zero<T: ZeroablePrimitive>(buf: &mut [T]) -> T {
         compiler_fence(Ordering::SeqCst),
         fence(Ordering::SeqCst),
     );
-
-    let mut ret: T = T::ZERO;
 
     lib_unknown_polymorphism::poly_branch! {
         weight(2) => {
@@ -213,7 +212,7 @@ pub fn volatile_zero<T: ZeroablePrimitive>(buf: &mut [T]) -> T {
         },
     }
 
-    ret
+    black_box(ret)
 }
 
 /// 定容安全容器的统一接口：写入、擦除、跨位宽字节视图与向更大容器搬运。

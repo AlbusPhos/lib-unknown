@@ -232,7 +232,8 @@ pub fn probe() -> u64 {
         #[cfg(not(any(
             target_arch = "aarch64",
             target_arch = "loongarch64",
-            target_arch = "wasm32"
+            target_arch = "wasm32",
+            all(target_arch = "arm", target_feature = "v7")
         )))]
         {
             2_500_000_000
@@ -400,6 +401,299 @@ fn reg_sig() -> u64 {
     s ^ (s >> 31)
 }
 
+/// 尝试从硬件真随机数生成器（TRNG / 硬件熵源指令）读取 64 位熵值。
+///
+/// - 返回 `Some(u64)`：硬件熵源采样成功。
+/// - 返回 `None`：当前架构/CPU 不支持用户态 TRNG 指令，或硬件熵池瞬时耗尽。
+pub fn trng() -> Option<u64> {
+    #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+    {
+        x86_trng()
+    }
+
+    #[cfg(target_arch = "aarch64")]
+    {
+        aarch64_trng()
+    }
+
+    #[cfg(all(
+        any(target_arch = "riscv64", target_arch = "riscv32"),
+        target_feature = "zkr"
+    ))]
+    {
+        riscv_trng()
+    }
+
+    #[cfg(all(target_arch = "powerpc64", target_feature = "power9-vector"))]
+    {
+        ppc64_trng()
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    {
+        wasm_trng()
+    }
+
+    #[cfg(not(any(
+        target_arch = "x86_64",
+        target_arch = "x86",
+        target_arch = "aarch64",
+        all(
+            any(target_arch = "riscv64", target_arch = "riscv32"),
+            target_feature = "zkr"
+        ),
+        all(target_arch = "powerpc64", target_feature = "power9-vector"),
+        target_arch = "wasm32"
+    )))]
+    {
+        None
+    }
+}
+#[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+fn x86_trng() -> Option<u64> {
+    use core::sync::atomic::AtomicU8;
+    // 0: 未检测, 1: 不支持, 2: 仅 RDRAND, 3: 支持 RDSEED + RDRAND
+    static CAP: AtomicU8 = AtomicU8::new(0);
+
+    #[cfg(target_arch = "x86")]
+    use core::arch::x86::{__cpuid, __cpuid_count, _rdrand32_step, _rdseed32_step};
+    #[cfg(target_arch = "x86_64")]
+    use core::arch::x86_64::{__cpuid, __cpuid_count, _rdrand64_step, _rdseed64_step};
+
+    let mut cap = CAP.load(Ordering::Relaxed);
+    if cap == 0 {
+        // SAFETY: `cpuid` 在所有现代 x86/x86_64 处理器上均可安全执行。
+        let leaf0 = __cpuid(0);
+        let leaf1 = __cpuid(1);
+        let has_rdrand = (leaf1.ecx & (1 << 30)) != 0;
+        let has_rdseed = if leaf0.eax >= 7 {
+            let leaf7 = __cpuid_count(7, 0);
+            (leaf7.ebx & (1 << 18)) != 0
+        } else {
+            false
+        };
+        cap = if has_rdseed {
+            3
+        } else if has_rdrand {
+            2
+        } else {
+            1
+        };
+        CAP.store(cap, Ordering::Relaxed);
+    }
+
+    if cap <= 1 {
+        return None;
+    }
+
+    #[target_feature(enable = "rdseed")]
+    unsafe fn try_rdseed() -> Option<u64> {
+        #[cfg(target_arch = "x86_64")]
+        {
+            let mut val = 0u64;
+            for _ in 0..16 {
+                if _rdseed64_step(&mut val) == 1 {
+                    return Some(val);
+                }
+            }
+            None
+        }
+        #[cfg(target_arch = "x86")]
+        {
+            let (mut lo, mut hi) = (0u32, 0u32);
+            let mut ok_lo = false;
+            for _ in 0..16 {
+                if _rdseed32_step(&mut lo) == 1 {
+                    ok_lo = true;
+                    break;
+                }
+            }
+            if !ok_lo {
+                return None;
+            }
+            for _ in 0..16 {
+                if _rdseed32_step(&mut hi) == 1 {
+                    return Some(((hi as u64) << 32) | (lo as u64));
+                }
+            }
+            None
+        }
+    }
+
+    #[target_feature(enable = "rdrand")]
+    unsafe fn try_rdrand() -> Option<u64> {
+        #[cfg(target_arch = "x86_64")]
+        {
+            let mut val = 0u64;
+            // Intel SDM 建议 RDRAND 最多重试 10 次
+            for _ in 0..10 {
+                if _rdrand64_step(&mut val) == 1 {
+                    return Some(val);
+                }
+            }
+            None
+        }
+        #[cfg(target_arch = "x86")]
+        {
+            let (mut lo, mut hi) = (0u32, 0u32);
+            let mut ok_lo = false;
+            for _ in 0..10 {
+                if _rdrand32_step(&mut lo) == 1 {
+                    ok_lo = true;
+                    break;
+                }
+            }
+            if !ok_lo {
+                return None;
+            }
+            for _ in 0..10 {
+                if _rdrand32_step(&mut hi) == 1 {
+                    return Some(((hi as u64) << 32) | (lo as u64));
+                }
+            }
+            None
+        }
+    }
+
+    // 优先读取物理熵调理输出 RDSEED；瞬时耗尽时回退到硬件 DRBG 输出 RDRAND
+    if cap == 3 {
+        // SAFETY: 已通过 CPUID Leaf 7 EBX[18] 确认支持 RDSEED。
+        if let Some(v) = unsafe { try_rdseed() } {
+            return Some(v);
+        }
+    }
+    // SAFETY: 已通过 CPUID Leaf 1 ECX[30] 确认支持 RDRAND。
+    unsafe { try_rdrand() }
+}
+
+#[cfg(target_arch = "aarch64")]
+fn aarch64_trng() -> Option<u64> {
+    fn has_feat_rng() -> bool {
+        #[cfg(target_feature = "rand")]
+        {
+            true
+        }
+        #[cfg(not(target_feature = "rand"))]
+        {
+            // Linux / Android 内核在 EL0 下会捕获并安全模拟 ID_AA64ISAR0_EL1 读取
+            #[cfg(any(target_os = "linux", target_os = "android"))]
+            {
+                use core::sync::atomic::AtomicU8;
+                static CAP: AtomicU8 = AtomicU8::new(0);
+                let mut cap = CAP.load(Ordering::Relaxed);
+                if cap == 0 {
+                    let isar0: u64;
+                    // SAFETY: Linux/Android 内核为 EL0 模拟读取处理器特性寄存器。
+                    unsafe {
+                        core::arch::asm!(
+                        "mrs {}, id_aa64isar0_el1",
+                        out(reg) isar0,
+                        options(nomem, nostack, preserves_flags)
+                        );
+                    }
+                    // bits [63:60] 为 RNDR 字段，非 0 表示硬件支持 FEAT_RNG
+                    cap = if ((isar0 >> 60) & 0xF) != 0 { 2 } else { 1 };
+                    CAP.store(cap, Ordering::Relaxed);
+                }
+                cap == 2
+            }
+            #[cfg(not(any(target_os = "linux", target_os = "android")))]
+            {
+                false
+            }
+        }
+    }
+
+    if !has_feat_rng() {
+        return None;
+    }
+
+    for _ in 0..10 {
+        let val: u64;
+        let ok: u64;
+        // SAFETY: 使用系统寄存器编码 s3_3_c2_c4_0 (RNDR) 避免编译期强制要求 `+rand`；
+        // 成功时 PSTATE.Z=0，失败时 Z=1，注意不可标注 `preserves_flags`。
+        unsafe {
+            core::arch::asm!(
+            "mrs {val}, s3_3_c2_c4_0",
+            "cset {ok}, ne",
+            val = out(reg) val,
+            ok = out(reg) ok,
+            options(nomem, nostack)
+            );
+        }
+        if ok != 0 {
+            return Some(val);
+        }
+    }
+    None
+}
+
+#[cfg(all(
+    any(target_arch = "riscv64", target_arch = "riscv32"),
+    target_feature = "zkr"
+))]
+fn riscv_trng() -> Option<u64> {
+    let mut acc = 0u64;
+    let mut collected = 0u32;
+    // Zkr 每次成功返回 16-bit 有效熵 (ES16)，需拼接 4 次构成 64 位
+    for _ in 0..64 {
+        let raw: usize;
+        // SAFETY: RISC-V Crypto 规范要求使用 csrrw 对 seed CSR (0x015) 写 x0 触发采样。
+        unsafe {
+            core::arch::asm!(
+            "csrrw {rd}, 0x015, x0",
+            rd = out(reg) raw,
+            options(nomem, nostack, preserves_flags)
+            );
+        }
+        match (raw >> 30) & 0b11 {
+            0b10 => {
+                // ES16: 低 16 位为有效物理熵
+                acc = (acc << 16) | ((raw & 0xFFFF) as u64);
+                collected += 1;
+                if collected == 4 {
+                    return Some(acc);
+                }
+            }
+            0b00 | 0b01 => continue, // BIST 或 WAIT，继续轮询
+            _ => return None,        // DEAD (0b11)，硬件熵源故障
+        }
+    }
+    None
+}
+
+#[cfg(all(target_arch = "powerpc64", target_feature = "power9-vector"))]
+fn ppc64_trng() -> Option<u64> {
+    for _ in 0..10 {
+        let val: u64;
+        // SAFETY: POWER9+ `darn` 指令，L=1 返回 64 位已调理随机数，失败返回全 1。
+        unsafe {
+            core::arch::asm!(
+            "darn {val}, 1",
+            val = out(reg) val,
+            options(nomem, nostack, preserves_flags)
+            );
+        }
+        if val != u64::MAX {
+            return Some(val);
+        }
+    }
+    None
+}
+
+#[cfg(target_arch = "wasm32")]
+fn wasm_trng() -> Option<u64> {
+    #[cfg(target_os = "wasi")]
+    {
+        Some(wasi::random::random::get_random_u64())
+    }
+    #[cfg(not(target_os = "wasi"))]
+    {
+        None
+    }
+}
+
 /// 混合多熵源（硬件计数器、ASLR 寄存器特征、L1 缓存与分支预测抖动）生成 64 位种子。
 pub fn seed() -> u64 {
     use core::hint::black_box;
@@ -411,13 +705,15 @@ pub fn seed() -> u64 {
     let c = COUNTER.fetch_add(1, Ordering::Relaxed) as u64;
     let x = probe();
     let y = reg_sig();
+    let z = trng().unwrap_or(0);
 
     let mut scratch = [0u64; SCRATCH_LEN];
     let sp_addr = scratch.as_mut_ptr() as usize as u64;
     for (idx, slot) in scratch.iter_mut().enumerate() {
         *slot = x
             .wrapping_add(y.rotate_left((idx as u32) * 4))
-            .wrapping_add(sp_addr ^ ((idx as u64).wrapping_mul(0x9E3779B97F4A7C15)));
+            .wrapping_add(sp_addr ^ ((idx as u64).wrapping_mul(0x9E3779B97F4A7C15)))
+            ^ !z;
     }
     let sp = black_box(scratch.as_mut_ptr());
 
@@ -452,12 +748,13 @@ pub fn seed() -> u64 {
             3 => s.wrapping_mul(767),
             7 => s.wrapping_add(945910149055313305),
             32 => s.wrapping_mul(302585092994045),
+            64 => s ^ trng().unwrap_or(0),
             _ => s ^ (t.rotate_right((i & 63) as u32)),
         };
         s
     };
 
-    let mut s = (x ^ y ^ !c).rotate_right((c & 63) as u32);
+    let mut s = (x ^ y ^ z ^ !c).rotate_right((c & 63) as u32);
 
     for i in 0..black_box(CONFIG.0) {
         if ((s >> 8) as u8 ^ i.wrapping_mul(0x9D)) > 127 {

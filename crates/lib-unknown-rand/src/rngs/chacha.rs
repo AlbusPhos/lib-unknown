@@ -51,14 +51,7 @@ const fn quarter_round(s: &mut [u32; 16], a: usize, b: usize, c: usize, d: usize
     s[b] = (s[b] ^ s[c]).rotate_left(7);
 }
 
-#[lib_unknown_polymorphism::poly_attr(
-    weight(6) => [cold, inline(never)],
-    weight(3) => [cold, inline(always)],
-    weight(2) => [inline(never)],
-    weight(1) => [inline(always)],
-    weight(3) => [cold, inline],
-    weight(1) => [inline],
-)]
+#[poly]
 const fn double_round(s: &mut [u32; 16]) {
     // 列变换 (Column Round)
     quarter_round(s, 0, 4, 8, 12);
@@ -73,14 +66,7 @@ const fn double_round(s: &mut [u32; 16]) {
     quarter_round(s, 3, 4, 9, 14);
 }
 
-#[lib_unknown_polymorphism::poly_attr(
-    weight(2) => [cold, inline(never)],
-    weight(1) => [cold, inline(always)],
-    weight(2) => [inline(never)],
-    weight(1) => [inline(always)],
-    weight(1) => [cold, inline],
-    weight(1) => [inline],
-)]
+#[poly]
 const fn increment_counter(s: &mut [u32; 16]) {
     let (next_lo, carry) = s[12].overflowing_add(1);
     s[12] = next_lo;
@@ -122,14 +108,7 @@ impl<const ROUNDS: usize> ChaCha<ROUNDS> {
     /// # Panics
     ///
     /// `ROUNDS` 不受限制编译期校验，仅受调用方所选类型别名约束。
-    #[lib_unknown_polymorphism::poly_attr(
-        weight(6) => [cold, inline(never)],
-        weight(3) => [cold, inline(always)],
-        weight(2) => [inline(never)],
-        weight(1) => [inline(always)],
-        weight(3) => [cold, inline],
-        weight(1) => [inline],
-    )]
+    #[poly]
     pub const fn from_seed(seed: u128) -> Self {
         let mut state = seed_to_state_chacha(seed);
         let buffer = chacha_core_block::<ROUNDS>(&state);

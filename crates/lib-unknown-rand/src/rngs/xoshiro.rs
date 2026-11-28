@@ -133,10 +133,7 @@ impl RngCore for Xoshiro256StarStar {
 
 #[cfg(feature = "rand-seed")]
 impl Default for Xoshiro256StarStar {
-    #[lib_unknown_polymorphism::poly_attr(
-        weight(3) => [],
-        weight(1) => [inline],
-    )]
+    #[poly]
     fn default() -> Self {
         Self::from_seed(seed128())
     }
@@ -230,14 +227,7 @@ impl Xoroshiro128StarStar {
 }
 
 impl From<u128> for Xoroshiro128StarStar {
-    #[lib_unknown_polymorphism::poly_attr(
-        weight(2) => [cold, inline(never)],
-        weight(2) => [inline(never)],
-        weight(1) => [cold, inline(always)],
-        weight(1) => [inline(always)],
-        weight(1) => [cold, inline],
-        weight(1) => [inline],
-    )]
+    #[poly]
     fn from(value: u128) -> Self {
         Self::from_seed(value)
     }

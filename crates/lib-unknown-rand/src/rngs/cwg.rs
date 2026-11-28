@@ -73,14 +73,7 @@ impl RngCore for Cwg64 {
 
 #[cfg(feature = "rand-seed")]
 impl Default for Cwg64 {
-    #[lib_unknown_polymorphism::poly_attr(
-        weight(2) => [cold, inline(never)],
-        weight(1) => [cold, inline(always)],
-        weight(1) => [cold, inline],
-        weight(2) => [inline(never)],
-        weight(1) => [inline(always)],
-        weight(1) => [inline],
-    )]
+    #[poly]
     fn default() -> Self {
         Self::from_seed(seed128())
     }
@@ -204,10 +197,7 @@ impl Cwg128 {
         Self { c: state }
     }
 
-    #[lib_unknown_polymorphism::poly_attr(
-        weight(3) => [],
-        weight(1) => [inline],
-    )]
+    #[poly]
     /// 推进一步 CGW128 状态并输出 128 位结果。
     pub const fn next(&mut self) -> u128 {
         step_cwg128(&mut self.c);

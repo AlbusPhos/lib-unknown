@@ -776,14 +776,7 @@ impl RngCore for GlobalRng {
 }
 
 /// 由全局 PRNG 抽取一个 `T::Random`。
-#[lib_unknown_polymorphism::poly_attr(
-    weight(6) => [cold, inline(never)],
-    weight(2) => [inline(never)],
-    weight(3) => [cold, inline(always)],
-    weight(3) => [cold, inline],
-    weight(1) => [inline(always)],
-    weight(1) => [inline],
-)]
+#[poly]
 pub fn random<T: Random>() -> T {
     GlobalRng.random()
 }
@@ -870,27 +863,13 @@ pub fn fill_bytes(dest: &mut [u8]) {
 /// let v = lib_unknown_rand::core::random_range(0u8..=9);
 /// assert!(v < 10);
 /// ```
-#[lib_unknown_polymorphism::poly_attr(
-    weight(6) => [cold, inline(never)],
-    weight(2) => [inline(never)],
-    weight(3) => [cold, inline(always)],
-    weight(1) => [inline(always)],
-    weight(3) => [cold, inline],
-    weight(1) => [inline],
-)]
+#[poly]
 pub fn random_range<R: SampleRange>(range: R) -> R::Output {
     GlobalRng.random_range(range)
 }
 
 /// 由全局 PRNG 种子做无偏洗牌。
-#[lib_unknown_polymorphism::poly_attr(
-    weight(6) => [cold, inline(never)],
-    weight(2) => [inline(never)],
-    weight(3) => [cold, inline(always)],
-    weight(3) => [cold, inline],
-    weight(1) => [inline(always)],
-    weight(1) => [inline],
-)]
+#[poly]
 pub fn shuffle<T, U: AsMut<[T]>>(table: U) -> U {
     GlobalRng.shuffle(table)
 }

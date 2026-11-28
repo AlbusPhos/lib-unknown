@@ -33,14 +33,7 @@ use core::ffi::CStr as StdCStr;
 use core::hint::black_box;
 use lib_unknown_errors::{ErrType, Result, bail, err};
 
-#[lib_unknown_polymorphism::poly_attr(
-    weight(2) => [cold, inline(never)],
-    weight(2) => [inline(never)],
-    weight(1) => [cold, inline(always)],
-    weight(1) => [inline(always)],
-    weight(1) => [cold, inline],
-    weight(1) => [inline],
-)]
+#[poly]
 fn safe_parse_cstr_and_wipe<F>(buffer: &mut [u8], mut push_fn: F) -> Result<()>
 where
     F: FnMut(&[u8]) -> Result<()>,

@@ -315,7 +315,7 @@ impl Parse for PolyArgs {
         }
 
         Ok(Self {
-            inline_prob: inline_prob.unwrap_or(0.5),
+            inline_prob: inline_prob.unwrap_or(0.4),
             cold_prob: cold_prob.unwrap_or(0.15),
         })
     }

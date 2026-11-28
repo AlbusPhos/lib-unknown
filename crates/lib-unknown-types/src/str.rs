@@ -719,14 +719,7 @@ impl<const N: usize> StackStr<N> {
     /// # Errors
     ///
     /// - 当已有长度超出 `M` 时返回 [`ErrType::CapacityExceeded`]。
-    #[lib_unknown_polymorphism::poly_attr(
-        weight(6) => [cold, inline(never)],
-        weight(3) => [cold, inline(always)],
-        weight(3) => [cold, inline],
-        weight(2) => [inline(never)],
-        weight(1) => [inline(always)],
-        weight(1) => [inline],
-    )]
+    #[poly]
     pub fn into_heap<const M: usize>(self) -> Result<HeapStr<M>> {
         self.0.extend_into::<HeapBytes<M>>(&[]).map(HeapStr)
     }
