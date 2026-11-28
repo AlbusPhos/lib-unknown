@@ -4,13 +4,12 @@
 
 #![no_std]
 
-use core::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
+use core::sync::atomic::{AtomicUsize, Ordering};
 
 /// 提供近似 1 GHz 的探针基频（作为 [`seed`] 派生路径的熵辅助分量）。
 pub fn probe() -> u64 {
     const SHIFT: u8 = 48;
     const TARGET_FREQ: u128 = 1_000_000_000; // 目标 1GHz (1 tick = 1 ns)
-    static MULTIPLIER_Q48: AtomicU64 = AtomicU64::new(0);
 
     fn raw_probe() -> u64 {
         #[cfg(target_arch = "x86_64")]
@@ -71,9 +70,9 @@ pub fn probe() -> u64 {
 
         #[cfg(target_arch = "riscv32")]
         {
-            let mut hi: u32;
-            let mut lo: u32;
-            let mut hi2: u32;
+            let hi: u32;
+            let lo: u32;
+            let _hi2: u32;
             // SAFETY: 32位下循环读取高32位与低32位，防止跨位进位撕裂。
             unsafe {
                 core::arch::asm!(
@@ -84,7 +83,7 @@ pub fn probe() -> u64 {
                 "bne {hi}, {hi2}, 2b",
                 hi = out(reg) hi,
                 lo = out(reg) lo,
-                hi2 = out(reg) hi2,
+                hi2 = out(reg) _hi2,
                 options(nomem, nostack, preserves_flags)
                 );
             }
@@ -121,9 +120,9 @@ pub fn probe() -> u64 {
 
         #[cfg(target_arch = "powerpc")]
         {
-            let mut hi: u32;
-            let mut lo: u32;
-            let mut hi2: u32;
+            let hi: u32;
+            let lo: u32;
+            let _hi2: u32;
             // SAFETY: 32位 PowerPC 需分别读取 TBU 和 TBL 并校验进位。
             unsafe {
                 core::arch::asm!(
@@ -135,7 +134,7 @@ pub fn probe() -> u64 {
                 "bne 2b",
                 hi = out(reg) hi,
                 lo = out(reg) lo,
-                hi2 = out(reg) hi2,
+                hi2 = out(reg) _hi2,
                 options(nomem, nostack)
                 );
             }
@@ -177,8 +176,9 @@ pub fn probe() -> u64 {
             target_arch = "wasm32"
         )))]
         {
-            static FALLBACK_TICKS: AtomicU64 = AtomicU64::new(1);
-            let tick = FALLBACK_TICKS.fetch_add(0x9E3779B97F4A7C15, Ordering::Relaxed);
+            static FALLBACK_TICKS: AtomicUsize = AtomicUsize::new(1);
+            let tick =
+                FALLBACK_TICKS.fetch_add(0x9E3779B97F4A7C15_u64 as usize, Ordering::Relaxed) as u64;
             tick ^ (&tick as *const u64 as usize as u64)
         }
     }
@@ -241,19 +241,35 @@ pub fn probe() -> u64 {
     }
 
     let raw = raw_probe();
-    let mut mult = MULTIPLIER_Q48.load(Ordering::Relaxed);
 
-    if mult == 0 {
+    #[cfg(target_has_atomic = "64")]
+    let mult = {
+        use core::sync::atomic::AtomicU64;
+        static MULTIPLIER_Q48: AtomicU64 = AtomicU64::new(0);
+        let mut m = MULTIPLIER_Q48.load(Ordering::Relaxed);
+        if m == 0 {
+            let hz = autodetect_hardware_freq();
+            let final_mult = if hz == 0 {
+                1u64 << SHIFT
+            } else {
+                // 使用 clamp 防止低频时钟(<15.2MHz)溢出截断或超高频时钟归零
+                (((TARGET_FREQ << SHIFT) / hz as u128).clamp(1, u64::MAX as u128)) as u64
+            };
+            MULTIPLIER_Q48.store(final_mult, Ordering::Relaxed);
+            m = final_mult;
+        }
+        m
+    };
+
+    #[cfg(not(target_has_atomic = "64"))]
+    let mult = {
         let hz = autodetect_hardware_freq();
-        let final_mult = if hz == 0 {
+        if hz == 0 {
             1u64 << SHIFT
         } else {
-            // 使用 clamp 防止低频时钟(<15.2MHz)溢出截断或超高频时钟归零
             (((TARGET_FREQ << SHIFT) / hz as u128).clamp(1, u64::MAX as u128)) as u64
-        };
-        MULTIPLIER_Q48.store(final_mult, Ordering::Relaxed);
-        mult = final_mult;
-    }
+        }
+    };
 
     ((raw as u128 * mult as u128) >> SHIFT) as u64
 }
@@ -449,6 +465,7 @@ pub fn trng() -> Option<u64> {
         None
     }
 }
+
 #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
 fn x86_trng() -> Option<u64> {
     use core::sync::atomic::AtomicU8;
