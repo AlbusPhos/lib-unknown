@@ -17,7 +17,8 @@ use lib_unknown_polymorphism::poly;
             target_arch = "x86_64",
             target_arch = "x86",
             target_arch = "aarch64",
-            target_arch = "riscv64"
+            target_arch = "riscv64",
+            target_arch = "loongarch64"
         )
     ),
     all(
@@ -26,7 +27,7 @@ use lib_unknown_polymorphism::poly;
     )
 )))]
 compile_error!(
-    "lib-unknown `sys-unix` is only supported on Linux/Android (x86_64/x86/aarch64/riscv64) and macOS (x86_64/aarch64)"
+    "lib-unknown `sys-unix` is only supported on Linux/Android (x86_64/x86/aarch64/riscv64/loongarch64) and macOS (x86_64/aarch64)"
 );
 
 use crate::syscall::*;
@@ -314,16 +315,20 @@ pub mod constants {
 }
 
 // =========================================================================
-// Linux aarch64 / riscv64 (asm-generic)
+// Linux aarch64 / riscv64 / loongarch64 (asm-generic)
 // =========================================================================
-/// Linux aarch64 / riscv64 平台的裸系统调用号（asm-generic）。
+/// Linux aarch64 / riscv64 / loongarch64 平台的裸系统调用号（asm-generic）。
 ///
 /// # Feature Requirement
 ///
 /// 需要启用 `"sys-unix"` 特性。
 #[cfg(all(
     any(target_os = "linux", target_os = "android"),
-    any(target_arch = "aarch64", target_arch = "riscv64")
+    any(
+        target_arch = "aarch64",
+        target_arch = "riscv64",
+        target_arch = "loongarch64"
+    )
 ))]
 #[allow(missing_docs)] // 常量表：语义由模块文档与系统 man 页统一说明
 pub mod constants {
@@ -616,14 +621,7 @@ fn as_sys_result(ret: isize) -> SysResult {
 ///
 /// sys_exit(0);
 /// ```
-#[lib_unknown_polymorphism::poly_attr(
-    weight(2) => [cold, inline(never)],
-    weight(6) => [inline(never)],
-    weight(1) => [cold, inline(always)],
-    weight(3) => [inline(always)],
-    weight(1) => [cold, inline],
-    weight(3) => [inline],
-)]
+#[poly]
 pub fn sys_exit(status: usize) -> ! {
     // SAFETY: `EXIT` 为合法调用号，`status` 为按值传递的退出码，无指针参数。
     unsafe {
@@ -728,14 +726,7 @@ pub fn sys_read(fd: usize, buf: &mut [u8]) -> SysResult {
 /// # Errors
 ///
 /// - 当 `fd` 无效或不可写时返回 [`ErrType::SysCallRet`]（内核 errno）。
-#[lib_unknown_polymorphism::poly_attr(
-    weight(2) => [cold, inline(never)],
-    weight(2) => [inline(never)],
-    weight(1) => [cold, inline(always)],
-    weight(1) => [cold, inline],
-    weight(1) => [inline(always)],
-    weight(1) => [inline],
-)]
+#[poly]
 pub fn sys_write(fd: usize, buf: &[u8]) -> SysResult {
     // SAFETY: `WRITE` 为合法调用号；`buf` 在调用期间有效且可读，长度如实传递。
     unsafe {
@@ -773,7 +764,7 @@ pub fn sys_close(fd: usize) -> SysResult {
 
 /// 以 `flags`/`mode` 打开 `path` 指向的路径，返回文件描述符。
 ///
-/// aarch64/riscv64 上经 `OPENAT + AT_FDCWD` 实现，其余经 `OPEN` 实现。
+/// aarch64/riscv64/loongarch64 上经 `OPENAT + AT_FDCWD` 实现，其余经 `OPEN` 实现。
 ///
 /// # Feature Requirement
 ///
@@ -792,16 +783,13 @@ pub fn sys_close(fd: usize) -> SysResult {
 /// # Errors
 ///
 /// - 当路径不存在、无权限或 `flags` 非法时返回 [`ErrType::SysCallRet`]（内核 errno）。
-#[lib_unknown_polymorphism::poly_attr(
-    weight(6) => [cold, inline(never)],
-    weight(2) => [inline(never)],
-    weight(3) => [cold, inline(always)],
-    weight(3) => [cold, inline],
-    weight(1) => [inline(always)],
-    weight(1) => [inline],
-)]
+#[poly]
 pub fn sys_open(path: &CStr, flags: usize, mode: usize) -> SysResult {
-    #[cfg(any(target_arch = "aarch64", target_arch = "riscv64"))]
+    #[cfg(any(
+        target_arch = "aarch64",
+        target_arch = "riscv64",
+        target_arch = "loongarch64"
+    ))]
     // SAFETY: 调用号与参数顺序符合目标 ABI；`path` 为合法 NUL 结尾 C 字符串，
     // 在调用期间有效；`AT_FDCWD` 按值传递。
     unsafe {
@@ -813,7 +801,11 @@ pub fn sys_open(path: &CStr, flags: usize, mode: usize) -> SysResult {
             mode,
         ))
     }
-    #[cfg(not(any(target_arch = "aarch64", target_arch = "riscv64")))]
+    #[cfg(not(any(
+        target_arch = "aarch64",
+        target_arch = "riscv64",
+        target_arch = "loongarch64"
+    )))]
     // SAFETY: 调用号与参数顺序符合目标 ABI；`path` 为合法 NUL 结尾 C 字符串，
     // 在调用期间有效。
     unsafe {
@@ -1039,14 +1031,6 @@ pub fn sys_bind(fd: usize, addr: &[u8]) -> SysResult {
 /// # Errors
 ///
 /// - 当 `fd` 非套接字或未绑定时返回 [`ErrType::SysCallRet`]（内核 errno）。
-#[lib_unknown_polymorphism::poly_attr(
-    weight(6) => [cold, inline(never)],
-    weight(2) => [inline(never)],
-    weight(3) => [cold, inline(always)],
-    weight(1) => [inline(always)],
-    weight(3) => [cold, inline],
-    weight(1) => [inline],
-)]
 pub fn sys_listen(fd: usize, backlog: usize) -> SysResult {
     // SAFETY: `LISTEN` 为合法调用号，所有参数按值传递，无指针参数。
     unsafe { as_sys_result(syscall2(constants::LISTEN, fd, backlog)) }
@@ -1129,7 +1113,7 @@ pub fn sys_connect(fd: usize, addr: &[u8]) -> SysResult {
 
 /// 派生子进程，父进程返回子进程 PID，子进程返回 0。
 ///
-/// Linux/Android 的 aarch64/riscv64 上经 `CLONE + SIGCHLD`（栈传 0，
+/// Linux/Android 的 aarch64/riscv64/loongarch64 上经 `CLONE + SIGCHLD`（栈传 0，
 /// Copy-On-Write）实现；其余平台/架构（含 macOS）经 `FORK` 实现。
 ///
 /// # Feature Requirement
@@ -1151,7 +1135,11 @@ pub fn sys_connect(fd: usize, addr: &[u8]) -> SysResult {
 pub fn sys_fork() -> SysResult {
     #[cfg(all(
         any(target_os = "linux", target_os = "android"),
-        any(target_arch = "aarch64", target_arch = "riscv64")
+        any(
+            target_arch = "aarch64",
+            target_arch = "riscv64",
+            target_arch = "loongarch64"
+        )
     ))]
     // SAFETY: `CLONE` 为合法调用号；仅传标志与空指针（clone 传 0 栈即 fork 语义），
     // 不触碰用户内存。
@@ -1163,7 +1151,11 @@ pub fn sys_fork() -> SysResult {
 
     #[cfg(not(all(
         any(target_os = "linux", target_os = "android"),
-        any(target_arch = "aarch64", target_arch = "riscv64")
+        any(
+            target_arch = "aarch64",
+            target_arch = "riscv64",
+            target_arch = "loongarch64"
+        )
     )))]
     // SAFETY: `FORK` 为合法调用号，无参数，不触碰用户内存。
     unsafe {
