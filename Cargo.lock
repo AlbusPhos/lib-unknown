@@ -16,7 +16,7 @@ checksum = "4e7648175b45a9a48536d676f68d918270699102aa8dab5496df06904c914600"
 
 [[package]]
 name = "lib-unknown"
-version = "0.6.0-rc1"
+version = "0.6.0"
 dependencies = [
  "lib-unknown-compiletest",
  "lib-unknown-crypto",
@@ -32,14 +32,14 @@ dependencies = [
 
 [[package]]
 name = "lib-unknown-compiletest"
-version = "0.6.0-rc1"
+version = "0.6.0"
 dependencies = [
  "lib-unknown-errors",
 ]
 
 [[package]]
 name = "lib-unknown-crypto"
-version = "0.6.0-rc1"
+version = "0.6.0"
 dependencies = [
  "lib-unknown-errors",
  "lib-unknown-hide",
@@ -49,7 +49,7 @@ dependencies = [
 
 [[package]]
 name = "lib-unknown-encoding"
-version = "0.6.0-rc1"
+version = "0.6.0"
 dependencies = [
  "lib-unknown-crypto",
  "lib-unknown-polymorphism",
@@ -57,11 +57,11 @@ dependencies = [
 
 [[package]]
 name = "lib-unknown-errors"
-version = "0.6.0-rc1"
+version = "0.6.0"
 
 [[package]]
 name = "lib-unknown-hash"
-version = "0.6.0-rc1"
+version = "0.6.0"
 dependencies = [
  "lib-unknown-hide",
  "lib-unknown-polymorphism",
@@ -70,7 +70,7 @@ dependencies = [
 
 [[package]]
 name = "lib-unknown-hide"
-version = "0.6.0-rc1"
+version = "0.6.0"
 dependencies = [
  "lib-unknown-lazy",
  "lib-unknown-polymorphism",
@@ -78,14 +78,14 @@ dependencies = [
 
 [[package]]
 name = "lib-unknown-lazy"
-version = "0.6.0-rc1"
+version = "0.6.0"
 dependencies = [
  "lib-unknown-polymorphism",
 ]
 
 [[package]]
 name = "lib-unknown-polymorphism"
-version = "0.6.0-rc1"
+version = "0.6.0"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -94,7 +94,7 @@ dependencies = [
 
 [[package]]
 name = "lib-unknown-rand"
-version = "0.6.0-rc1"
+version = "0.6.0"
 dependencies = [
  "lib-unknown-crypto",
  "lib-unknown-hide",
@@ -105,7 +105,7 @@ dependencies = [
 
 [[package]]
 name = "lib-unknown-seed"
-version = "0.6.0-rc1"
+version = "0.6.0"
 dependencies = [
  "wasi",
  "wasm-bindgen",
@@ -113,7 +113,7 @@ dependencies = [
 
 [[package]]
 name = "lib-unknown-sys"
-version = "0.6.0-rc1"
+version = "0.6.0"
 dependencies = [
  "lib-unknown-errors",
  "lib-unknown-polymorphism",
@@ -121,7 +121,7 @@ dependencies = [
 
 [[package]]
 name = "lib-unknown-types"
-version = "0.6.0-rc1"
+version = "0.6.0"
 dependencies = [
  "lib-unknown-errors",
  "lib-unknown-polymorphism",
