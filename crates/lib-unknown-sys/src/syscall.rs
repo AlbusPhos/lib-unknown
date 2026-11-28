@@ -16,6 +16,7 @@ macro_rules! unsupported_target {
                     target_arch = "x86_64",
                     target_arch = "aarch64",
                     target_arch = "riscv64",
+                    target_arch = "loongarch64",
                     target_arch = "x86"
                 )
             ),
@@ -72,8 +73,6 @@ pub unsafe fn syscall0(n: usize) -> isize {
     ))]
     // SAFETY: 调用前提由外层 `unsafe fn` 的 `# Safety` 文档约定；此处 asm 直接
     // 陷入内核，被覆盖的寄存器已全部通过 lateout(_) 显式声明，遵循裸 syscall ABI。
-    // SAFETY: 调用前提由外层 `unsafe fn` 的 `# Safety` 文档约定；此处 asm 直接
-    // 触发陷入指令，按平台裸 syscall ABI 传入寄存器，被覆盖寄存器全部经 lateout(_) 声明。
     unsafe {
         core::arch::asm!(
         "syscall",
@@ -112,6 +111,21 @@ pub unsafe fn syscall0(n: usize) -> isize {
         in("a7") n,
         lateout("a0") ret,
         options(nostack) // 同理，Linux riscv64 syscall 只保证修改 a0
+        );
+    }
+
+    #[cfg(all(
+        any(target_os = "linux", target_os = "android"),
+        target_arch = "loongarch64"
+    ))]
+    // SAFETY: 调用前提由外层 `unsafe fn` 的 `# Safety` 文档约定；此处 asm 直接
+    // 触发陷入指令，按平台裸 syscall ABI 传入寄存器，被覆盖寄存器全部经 lateout(_) 声明。
+    unsafe {
+        core::arch::asm!(
+        "syscall 0",
+        in("a7") n,
+        lateout("a0") ret,
+        options(nostack) // Linux loongarch64 syscall 只保证修改 a0，其余寄存器保留
         );
     }
 
@@ -237,8 +251,6 @@ pub unsafe fn syscall1(n: usize, a1: usize) -> isize {
         target_arch = "x86_64"
     ))]
     // SAFETY: 调用前提由外层 `unsafe fn` 的 `# Safety` 文档约定；此处 asm 直接
-    // 陷入内核，被覆盖的寄存器已全部通过 lateout(_) 显式声明，遵循裸 syscall ABI。
-    // SAFETY: 调用前提由外层 `unsafe fn` 的 `# Safety` 文档约定；此处 asm 直接
     // 触发陷入指令，按平台裸 syscall ABI 传入寄存器，被覆盖寄存器全部经 lateout(_) 声明。
     unsafe {
         core::arch::asm!(
@@ -276,6 +288,21 @@ pub unsafe fn syscall1(n: usize, a1: usize) -> isize {
     unsafe {
         core::arch::asm!(
         "ecall",
+        in("a7") n,
+        inlateout("a0") a1 => ret,
+        options(nostack)
+        );
+    }
+
+    #[cfg(all(
+        any(target_os = "linux", target_os = "android"),
+        target_arch = "loongarch64"
+    ))]
+    // SAFETY: 调用前提由外层 `unsafe fn` 的 `# Safety` 文档约定；此处 asm 直接
+    // 触发陷入指令，按平台裸 syscall ABI 传入寄存器，被覆盖寄存器全部经 lateout(_) 声明。
+    unsafe {
+        core::arch::asm!(
+        "syscall 0",
         in("a7") n,
         inlateout("a0") a1 => ret,
         options(nostack)
@@ -402,8 +429,6 @@ pub unsafe fn syscall2(n: usize, a1: usize, a2: usize) -> isize {
         target_arch = "x86_64"
     ))]
     // SAFETY: 调用前提由外层 `unsafe fn` 的 `# Safety` 文档约定；此处 asm 直接
-    // 陷入内核，被覆盖的寄存器已全部通过 lateout(_) 显式声明，遵循裸 syscall ABI。
-    // SAFETY: 调用前提由外层 `unsafe fn` 的 `# Safety` 文档约定；此处 asm 直接
     // 触发陷入指令，按平台裸 syscall ABI 传入寄存器，被覆盖寄存器全部经 lateout(_) 声明。
     unsafe {
         core::arch::asm!(
@@ -443,6 +468,22 @@ pub unsafe fn syscall2(n: usize, a1: usize, a2: usize) -> isize {
     unsafe {
         core::arch::asm!(
         "ecall",
+        in("a7") n,
+        inlateout("a0") a1 => ret,
+        in("a1") a2,
+        options(nostack)
+        );
+    }
+
+    #[cfg(all(
+        any(target_os = "linux", target_os = "android"),
+        target_arch = "loongarch64"
+    ))]
+    // SAFETY: 调用前提由外层 `unsafe fn` 的 `# Safety` 文档约定；此处 asm 直接
+    // 触发陷入指令，按平台裸 syscall ABI 传入寄存器，被覆盖寄存器全部经 lateout(_) 声明。
+    unsafe {
+        core::arch::asm!(
+        "syscall 0",
         in("a7") n,
         inlateout("a0") a1 => ret,
         in("a1") a2,
@@ -572,8 +613,6 @@ pub unsafe fn syscall3(n: usize, a1: usize, a2: usize, a3: usize) -> isize {
         target_arch = "x86_64"
     ))]
     // SAFETY: 调用前提由外层 `unsafe fn` 的 `# Safety` 文档约定；此处 asm 直接
-    // 陷入内核，被覆盖的寄存器已全部通过 lateout(_) 显式声明，遵循裸 syscall ABI。
-    // SAFETY: 调用前提由外层 `unsafe fn` 的 `# Safety` 文档约定；此处 asm 直接
     // 触发陷入指令，按平台裸 syscall ABI 传入寄存器，被覆盖寄存器全部经 lateout(_) 声明。
     unsafe {
         core::arch::asm!(
@@ -615,6 +654,23 @@ pub unsafe fn syscall3(n: usize, a1: usize, a2: usize, a3: usize) -> isize {
     unsafe {
         core::arch::asm!(
         "ecall",
+        in("a7") n,
+        inlateout("a0") a1 => ret,
+        in("a1") a2,
+        in("a2") a3,
+        options(nostack)
+        );
+    }
+
+    #[cfg(all(
+        any(target_os = "linux", target_os = "android"),
+        target_arch = "loongarch64"
+    ))]
+    // SAFETY: 调用前提由外层 `unsafe fn` 的 `# Safety` 文档约定；此处 asm 直接
+    // 触发陷入指令，按平台裸 syscall ABI 传入寄存器，被覆盖寄存器全部经 lateout(_) 声明。
+    unsafe {
+        core::arch::asm!(
+        "syscall 0",
         in("a7") n,
         inlateout("a0") a1 => ret,
         in("a1") a2,
@@ -751,8 +807,6 @@ pub unsafe fn syscall4(n: usize, a1: usize, a2: usize, a3: usize, a4: usize) -> 
         target_arch = "x86_64"
     ))]
     // SAFETY: 调用前提由外层 `unsafe fn` 的 `# Safety` 文档约定；此处 asm 直接
-    // 陷入内核，被覆盖的寄存器已全部通过 lateout(_) 显式声明，遵循裸 syscall ABI。
-    // SAFETY: 调用前提由外层 `unsafe fn` 的 `# Safety` 文档约定；此处 asm 直接
     // 触发陷入指令，按平台裸 syscall ABI 传入寄存器，被覆盖寄存器全部经 lateout(_) 声明。
     unsafe {
         core::arch::asm!(
@@ -796,6 +850,24 @@ pub unsafe fn syscall4(n: usize, a1: usize, a2: usize, a3: usize, a4: usize) -> 
     unsafe {
         core::arch::asm!(
         "ecall",
+        in("a7") n,
+        inlateout("a0") a1 => ret,
+        in("a1") a2,
+        in("a2") a3,
+        in("a3") a4,
+        options(nostack)
+        );
+    }
+
+    #[cfg(all(
+        any(target_os = "linux", target_os = "android"),
+        target_arch = "loongarch64"
+    ))]
+    // SAFETY: 调用前提由外层 `unsafe fn` 的 `# Safety` 文档约定；此处 asm 直接
+    // 触发陷入指令，按平台裸 syscall ABI 传入寄存器，被覆盖寄存器全部经 lateout(_) 声明。
+    unsafe {
+        core::arch::asm!(
+        "syscall 0",
         in("a7") n,
         inlateout("a0") a1 => ret,
         in("a1") a2,
@@ -943,8 +1015,6 @@ pub unsafe fn syscall5(n: usize, a1: usize, a2: usize, a3: usize, a4: usize, a5:
         target_arch = "x86_64"
     ))]
     // SAFETY: 调用前提由外层 `unsafe fn` 的 `# Safety` 文档约定；此处 asm 直接
-    // 陷入内核，被覆盖的寄存器已全部通过 lateout(_) 显式声明，遵循裸 syscall ABI。
-    // SAFETY: 调用前提由外层 `unsafe fn` 的 `# Safety` 文档约定；此处 asm 直接
     // 触发陷入指令，按平台裸 syscall ABI 传入寄存器，被覆盖寄存器全部经 lateout(_) 声明。
     unsafe {
         core::arch::asm!(
@@ -990,6 +1060,25 @@ pub unsafe fn syscall5(n: usize, a1: usize, a2: usize, a3: usize, a4: usize, a5:
     unsafe {
         core::arch::asm!(
         "ecall",
+        in("a7") n,
+        inlateout("a0") a1 => ret,
+        in("a1") a2,
+        in("a2") a3,
+        in("a3") a4,
+        in("a4") a5,
+        options(nostack)
+        );
+    }
+
+    #[cfg(all(
+        any(target_os = "linux", target_os = "android"),
+        target_arch = "loongarch64"
+    ))]
+    // SAFETY: 调用前提由外层 `unsafe fn` 的 `# Safety` 文档约定；此处 asm 直接
+    // 触发陷入指令，按平台裸 syscall ABI 传入寄存器，被覆盖寄存器全部经 lateout(_) 声明。
+    unsafe {
+        core::arch::asm!(
+        "syscall 0",
         in("a7") n,
         inlateout("a0") a1 => ret,
         in("a1") a2,
@@ -1158,8 +1247,6 @@ pub unsafe fn syscall6(
         target_arch = "x86_64"
     ))]
     // SAFETY: 调用前提由外层 `unsafe fn` 的 `# Safety` 文档约定；此处 asm 直接
-    // 陷入内核，被覆盖的寄存器已全部通过 lateout(_) 显式声明，遵循裸 syscall ABI。
-    // SAFETY: 调用前提由外层 `unsafe fn` 的 `# Safety` 文档约定；此处 asm 直接
     // 触发陷入指令，按平台裸 syscall ABI 传入寄存器，被覆盖寄存器全部经 lateout(_) 声明。
     unsafe {
         core::arch::asm!(
@@ -1207,6 +1294,26 @@ pub unsafe fn syscall6(
     unsafe {
         core::arch::asm!(
         "ecall",
+        in("a7") n,
+        inlateout("a0") a1 => ret,
+        in("a1") a2,
+        in("a2") a3,
+        in("a3") a4,
+        in("a4") a5,
+        in("a5") a6,
+        options(nostack)
+        );
+    }
+
+    #[cfg(all(
+        any(target_os = "linux", target_os = "android"),
+        target_arch = "loongarch64"
+    ))]
+    // SAFETY: 调用前提由外层 `unsafe fn` 的 `# Safety` 文档约定；此处 asm 直接
+    // 触发陷入指令，按平台裸 syscall ABI 传入寄存器，被覆盖寄存器全部经 lateout(_) 声明。
+    unsafe {
+        core::arch::asm!(
+        "syscall 0",
         in("a7") n,
         inlateout("a0") a1 => ret,
         in("a1") a2,

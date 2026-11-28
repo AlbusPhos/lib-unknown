@@ -757,7 +757,7 @@ mod tests {
     #[test]
     fn poly_args_parsing() {
         let default_args: PolyArgs = syn::parse2(quote!()).unwrap();
-        assert_eq!(default_args.inline_prob, 0.5);
+        assert_eq!(default_args.inline_prob, 0.4);
         assert_eq!(default_args.cold_prob, 0.15);
 
         let named_args: PolyArgs = syn::parse2(quote!(cold = 0.25, inline = 0.75)).unwrap();
