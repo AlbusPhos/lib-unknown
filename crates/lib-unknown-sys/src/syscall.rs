@@ -123,8 +123,8 @@ pub unsafe fn syscall0(n: usize) -> isize {
     unsafe {
         core::arch::asm!(
         "syscall 0",
-        in("a7") n,
-        lateout("a0") ret,
+        in("$a7") n,
+        lateout("$a0") ret,
         options(nostack) // Linux loongarch64 syscall 只保证修改 a0，其余寄存器保留
         );
     }
@@ -303,8 +303,8 @@ pub unsafe fn syscall1(n: usize, a1: usize) -> isize {
     unsafe {
         core::arch::asm!(
         "syscall 0",
-        in("a7") n,
-        inlateout("a0") a1 => ret,
+        in("$a7") n,
+        inlateout("$a0") a1 => ret,
         options(nostack)
         );
     }
@@ -484,9 +484,9 @@ pub unsafe fn syscall2(n: usize, a1: usize, a2: usize) -> isize {
     unsafe {
         core::arch::asm!(
         "syscall 0",
-        in("a7") n,
-        inlateout("a0") a1 => ret,
-        in("a1") a2,
+        in("$a7") n,
+        inlateout("$a0") a1 => ret,
+        in("$a1") a2,
         options(nostack)
         );
     }
@@ -671,10 +671,10 @@ pub unsafe fn syscall3(n: usize, a1: usize, a2: usize, a3: usize) -> isize {
     unsafe {
         core::arch::asm!(
         "syscall 0",
-        in("a7") n,
-        inlateout("a0") a1 => ret,
-        in("a1") a2,
-        in("a2") a3,
+        in("$a7") n,
+        inlateout("$a0") a1 => ret,
+        in("$a1") a2,
+        in("$a2") a3,
         options(nostack)
         );
     }
@@ -868,11 +868,11 @@ pub unsafe fn syscall4(n: usize, a1: usize, a2: usize, a3: usize, a4: usize) -> 
     unsafe {
         core::arch::asm!(
         "syscall 0",
-        in("a7") n,
-        inlateout("a0") a1 => ret,
-        in("a1") a2,
-        in("a2") a3,
-        in("a3") a4,
+        in("$a7") n,
+        inlateout("$a0") a1 => ret,
+        in("$a1") a2,
+        in("$a2") a3,
+        in("$a3") a4,
         options(nostack)
         );
     }
@@ -1079,12 +1079,12 @@ pub unsafe fn syscall5(n: usize, a1: usize, a2: usize, a3: usize, a4: usize, a5:
     unsafe {
         core::arch::asm!(
         "syscall 0",
-        in("a7") n,
-        inlateout("a0") a1 => ret,
-        in("a1") a2,
-        in("a2") a3,
-        in("a3") a4,
-        in("a4") a5,
+        in("$a7") n,
+        inlateout("$a0") a1 => ret,
+        in("$a1") a2,
+        in("$a2") a3,
+        in("$a3") a4,
+        in("$a4") a5,
         options(nostack)
         );
     }
@@ -1314,13 +1314,13 @@ pub unsafe fn syscall6(
     unsafe {
         core::arch::asm!(
         "syscall 0",
-        in("a7") n,
-        inlateout("a0") a1 => ret,
-        in("a1") a2,
-        in("a2") a3,
-        in("a3") a4,
-        in("a4") a5,
-        in("a5") a6,
+        in("$a7") n,
+        inlateout("$a0") a1 => ret,
+        in("$a1") a2,
+        in("$a2") a3,
+        in("$a3") a4,
+        in("$a4") a5,
+        in("$a5") a6,
         options(nostack)
         );
     }

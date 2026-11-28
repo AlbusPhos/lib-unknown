@@ -462,15 +462,20 @@ fn x86_trng() -> Option<u64> {
 
     let mut cap = CAP.load(Ordering::Relaxed);
     if cap == 0 {
-        // SAFETY: `cpuid` 在所有现代 x86/x86_64 处理器上均可安全执行。
-        let leaf0 = __cpuid(0);
-        let leaf1 = __cpuid(1);
-        let has_rdrand = (leaf1.ecx & (1 << 30)) != 0;
-        let has_rdseed = if leaf0.eax >= 7 {
-            let leaf7 = __cpuid_count(7, 0);
-            (leaf7.ebx & (1 << 18)) != 0
-        } else {
-            false
+        // SAFETY: `cpuid` 在所有受支持的 x86/x86_64 目标处理器上均可安全执行，不访问内存。
+        // 兼容 MSRV 1.92（unsafe fn）与新版 stdarch（safe fn）。
+        #[allow(unused_unsafe)]
+        let (has_rdrand, has_rdseed) = unsafe {
+            let leaf0 = __cpuid(0);
+            let leaf1 = __cpuid(1);
+            let rdrand = (leaf1.ecx & (1 << 30)) != 0;
+            let rdseed = if leaf0.eax >= 7 {
+                let leaf7 = __cpuid_count(7, 0);
+                (leaf7.ebx & (1 << 18)) != 0
+            } else {
+                false
+            };
+            (rdrand, rdseed)
         };
         cap = if has_rdseed {
             3
@@ -492,7 +497,9 @@ fn x86_trng() -> Option<u64> {
         {
             let mut val = 0u64;
             for _ in 0..16 {
-                if _rdseed64_step(&mut val) == 1 {
+                // SAFETY: 调用方已通过 CPUID 确认支持 RDSEED，且 `val` 为有效的可变引用。
+                #[allow(unused_unsafe)]
+                if unsafe { _rdseed64_step(&mut val) } == 1 {
                     return Some(val);
                 }
             }
@@ -503,7 +510,9 @@ fn x86_trng() -> Option<u64> {
             let (mut lo, mut hi) = (0u32, 0u32);
             let mut ok_lo = false;
             for _ in 0..16 {
-                if _rdseed32_step(&mut lo) == 1 {
+                // SAFETY: 调用方已通过 CPUID 确认支持 RDSEED，且 `lo` 为有效的可变引用。
+                #[allow(unused_unsafe)]
+                if unsafe { _rdseed32_step(&mut lo) } == 1 {
                     ok_lo = true;
                     break;
                 }
@@ -512,7 +521,9 @@ fn x86_trng() -> Option<u64> {
                 return None;
             }
             for _ in 0..16 {
-                if _rdseed32_step(&mut hi) == 1 {
+                // SAFETY: 调用方已通过 CPUID 确认支持 RDSEED，且 `hi` 为有效的可变引用。
+                #[allow(unused_unsafe)]
+                if unsafe { _rdseed32_step(&mut hi) } == 1 {
                     return Some(((hi as u64) << 32) | (lo as u64));
                 }
             }
@@ -527,7 +538,9 @@ fn x86_trng() -> Option<u64> {
             let mut val = 0u64;
             // Intel SDM 建议 RDRAND 最多重试 10 次
             for _ in 0..10 {
-                if _rdrand64_step(&mut val) == 1 {
+                // SAFETY: 调用方已通过 CPUID 确认支持 RDRAND，且 `val` 为有效的可变引用。
+                #[allow(unused_unsafe)]
+                if unsafe { _rdrand64_step(&mut val) } == 1 {
                     return Some(val);
                 }
             }
@@ -538,7 +551,9 @@ fn x86_trng() -> Option<u64> {
             let (mut lo, mut hi) = (0u32, 0u32);
             let mut ok_lo = false;
             for _ in 0..10 {
-                if _rdrand32_step(&mut lo) == 1 {
+                // SAFETY: 调用方已通过 CPUID 确认支持 RDRAND，且 `lo` 为有效的可变引用。
+                #[allow(unused_unsafe)]
+                if unsafe { _rdrand32_step(&mut lo) } == 1 {
                     ok_lo = true;
                     break;
                 }
@@ -547,7 +562,9 @@ fn x86_trng() -> Option<u64> {
                 return None;
             }
             for _ in 0..10 {
-                if _rdrand32_step(&mut hi) == 1 {
+                // SAFETY: 调用方已通过 CPUID 确认支持 RDRAND，且 `hi` 为有效的可变引用。
+                #[allow(unused_unsafe)]
+                if unsafe { _rdrand32_step(&mut hi) } == 1 {
                     return Some(((hi as u64) << 32) | (lo as u64));
                 }
             }
